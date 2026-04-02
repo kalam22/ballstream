@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#080c14" />
+    
+    <!-- Primary Meta Tags -->
+    <title>Football Stream - Live Match Center & Jadwal Pertandingan</title>
+    <meta name="title" content="Football Stream - Live Match Center & Jadwal Pertandingan" />
+    <meta name="description" content="Pantau pertandingan sepak bola live, jadwal upcoming, dan hasil terbaru dari berbagai liga dunia. Streaming gratis dengan kualitas HD." />
+    <meta name="keywords" content="live football, streaming bola, jadwal pertandingan, hasil pertandingan, live score, sepak bola live, nonton bola online" />
+    <meta name="author" content="Football Stream" />
+    <meta name="robots" content="index, follow" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://kana.stream/" />
+    <meta property="og:title" content="Football Stream - Live Match Center & Jadwal Pertandingan" />
+    <meta property="og:description" content="Pantau pertandingan sepak bola live, jadwal upcoming, dan hasil terbaru dari berbagai liga dunia." />
+    <meta property="og:image" content="https://kana.stream/og-image.jpg" />
+    <meta property="og:site_name" content="kana.stream" />
+    <meta property="og:locale" content="id_ID" />
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://kana.stream/" />
+    <meta property="twitter:title" content="Football Stream - Live Match Center" />
+    <meta property="twitter:description" content="Pantau pertandingan sepak bola live, jadwal upcoming, dan hasil terbaru." />
+    <meta property="twitter:image" content="https://kana.stream/og-image.jpg" />
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="canonical" href="https://kana.stream/" />
+    
+    <!-- Preconnect to external domains for faster loading -->
+    <link rel="preconnect" href="https://api.sportsrc.org" />
+    <link rel="dns-prefetch" href="https://api.sportsrc.org" />
+    
+    <!-- Theme init: sync to prevent flash -->
+    <script>
+      (function(){
+        try {
+          var s = localStorage.getItem('ks-theme');
+          var p = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          document.documentElement.setAttribute('data-theme', s || p);
+        } catch(e){}
+      })();
+    </script>
+  </head>
+  <body>
+    <!-- Skip to content for accessibility -->
+    <a href="#main-content" class="skip-to-content">
+      Skip to main content
+    </a>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"compress/gzip"
 	"context"
+	"fmt"
+	"football-stream/database"
 	"football-stream/handlers"
 	"io"
 	"log"
@@ -11,6 +13,8 @@ import (
 	"net"
 	"net/http"
 	"os"
+
+	"github.com/golang-jwt/jwt/v5"
 	"os/signal"
 	"strconv"
 	"strings"
@@ -342,8 +346,8 @@ func corsMiddleware(next http.Handler) http.Handler {
 
 			if allowed {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
-				w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
-				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-API-Key")
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-API-Key, Authorization")
 				w.Header().Set("Access-Control-Allow-Credentials", "true")
 				w.Header().Set("Access-Control-Max-Age", "3600")
 				
@@ -460,6 +464,12 @@ func apiKeyMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
+		// Auth endpoints are always public (no API key needed)
+		if strings.HasPrefix(r.URL.Path, "/api/auth/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		// If auth not required, allow public read-only endpoints
 		if !authRequired {
 			if r.Method == http.MethodGet && (
@@ -487,23 +497,41 @@ func apiKeyMiddleware(next http.Handler) http.Handler {
 			apiKey = r.URL.Query().Get("api_key")
 		}
 
-		if apiKey == "" {
-			handlers.WriteError(w, http.StatusUnauthorized, handlers.ErrMissingAPIKey, "Missing API key")
+		// Also check JWT token
+		authHeader := r.Header.Get("Authorization")
+		hasValidJWT := false
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+			token, _ := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, fmt.Errorf("unexpected signing method")
+				}
+				return []byte(os.Getenv("JWT_SECRET")), nil
+			})
+			if token != nil && token.Valid {
+				hasValidJWT = true
+			}
+		}
+
+		if apiKey == "" && !hasValidJWT {
+			handlers.WriteError(w, http.StatusUnauthorized, handlers.ErrMissingAPIKey, "Missing API key or Token")
 			return
 		}
 
-		// Validate API key
-		valid := false
-		for _, key := range validKeys {
-			if key != "" && key == apiKey {
-				valid = true
-				break
+		// Validate API key and Token
+		valid := hasValidJWT
+		if !valid && apiKey != "" {
+			for _, key := range validKeys {
+				if key != "" && key == apiKey {
+					valid = true
+					break
+				}
 			}
 		}
 
 		if !valid {
-			log.Printf("[Auth] Invalid API key attempt from %s", extractClientIP(r))
-			handlers.WriteError(w, http.StatusForbidden, handlers.ErrInvalidAPIKey, "Invalid API key")
+			log.Printf("[Auth] Invalid key or token attempt from %s", extractClientIP(r))
+			handlers.WriteError(w, http.StatusForbidden, handlers.ErrInvalidAPIKey, "Invalid credentials")
 			return
 		}
 
@@ -529,6 +557,7 @@ func buildMux(lastModified time.Time) (http.Handler, error) {
 	})
 
 	// API v1 routes (versioned)
+	mux.HandleFunc("/api/v1/auth/login", handlers.HandleLogin)
 	mux.HandleFunc("/api/v1/matches", handlers.APIProxy)
 	mux.HandleFunc("/api/v1/bootstrap", handlers.GetBootstrap)
 	mux.HandleFunc("/api/v1/account", handlers.GetAccount)
@@ -571,6 +600,9 @@ func main() {
 	// Load .env file (real env vars take priority)
 	loadEnv(".env")
 	lastModified := time.Now().UTC()
+
+	// Initialize the Database (this connects and seeds the initial users if empty)
+	database.InitDB()
 
 	// Start background cache updater
 	log.Println("Starting cache updater...")

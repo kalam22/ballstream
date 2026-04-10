@@ -1,8 +1,9 @@
 import { useTheme } from '../context/ThemeContext.jsx'
 import { useData } from '../context/DataContext.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
 import { SunIcon, MoonIcon } from './Icons.jsx'
 import { formatCountdown } from '../utils/format.js'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, LogOut, User } from 'lucide-react'
 
 function ThemeToggle() {
   const { theme, toggle } = useTheme()
@@ -26,6 +27,7 @@ function ThemeToggle() {
  */
 export default function Navbar({ activePage, countdown }) {
   const { account } = useData()
+  const { user, isAuthenticated, logout } = useAuth()
 
   const remaining = account ? account.daily_limit - account.usage_today : null
   const ratio = account ? account.usage_today / (account.daily_limit || 1) : 0

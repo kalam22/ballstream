@@ -3,14 +3,12 @@ import HomePage from './pages/HomePage.jsx'
 import StatusPage from './pages/StatusPage.jsx'
 import MatchPage from './pages/MatchPage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
+import LoginPage from './pages/LoginPage.jsx'
 
-/**
- * Minimal client-side router — no library needed for 3 routes.
- * Handles: / | /status | /match/:id
- */
 function getRoute(pathname) {
-  if (pathname === '/') return { page: 'home' }
+  if (pathname === '/')       return { page: 'home' }
   if (pathname === '/status') return { page: 'status' }
+  if (pathname === '/login')  return { page: 'login' }
   const matchRe = /^\/match\/(.+)$/
   const m = pathname.match(matchRe)
   if (m) return { page: 'match', id: decodeURIComponent(m[1]) }
@@ -26,7 +24,6 @@ export default function Router() {
     return () => window.removeEventListener('popstate', onPop)
   }, [])
 
-  // Expose navigate globally so <a> clicks can use pushState
   useEffect(() => {
     const onClick = (e) => {
       const a = e.target.closest('a[href]')
@@ -43,6 +40,7 @@ export default function Router() {
 
   if (route.page === 'home')   return <HomePage />
   if (route.page === 'status') return <StatusPage />
+  if (route.page === 'login')  return <LoginPage />
   if (route.page === 'match')  return <MatchPage id={route.id} />
 
   return <NotFoundPage />

@@ -86,10 +86,11 @@ export default function LoginPage() {
                     type="email"
                     required
                     autoComplete="email"
-                    placeholder="nama@email.com"
+                    placeholder="Masukkan Email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="form-input"
+                    style={{ paddingLeft: '2.75rem' }}
                   />
                 </div>
               </div>
@@ -106,10 +107,11 @@ export default function LoginPage() {
                     type={showPassword ? 'text' : 'password'}
                     required
                     autoComplete="current-password"
-                    placeholder="Masukkan password"
+                    placeholder="Masukkan Password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="form-input"
+                    style={{ paddingLeft: '2.75rem' }}
                   />
                   <button
                     type="button"

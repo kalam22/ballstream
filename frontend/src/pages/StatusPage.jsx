@@ -1,7 +1,9 @@
 import Navbar from '../components/Navbar.jsx'
 import { SkeletonGrid, Notice, ProgressBar } from '../components/UI.jsx'
 import { useData } from '../context/DataContext.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
 import { useUpstreams } from '../hooks/useApi.js'
+import { Icon } from '../components/Icons.jsx'
 
 function formatTimestamp(timestamp) {
   if (!timestamp) return '—';
@@ -76,7 +78,24 @@ function UpstreamCard({ item }) {
 
 export default function StatusPage() {
   const { account, sports } = useData()
+  const { user } = useAuth()
   const { upstreams, error: upErr } = useUpstreams()
+
+  // Check if current user is super admin
+  if (user?.role !== 'super_admin') {
+    return (
+      <>
+        <Navbar activePage="status" />
+        <div className="page-container">
+          <div className="error-state">
+            <Icon name="alert-circle" size={48} />
+            <h2>Akses Ditolak</h2>
+            <p>Anda tidak memiliki izin untuk mengakses halaman ini. Hanya Super Admin yang dapat melihat Status API.</p>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   const ratio     = account ? account.usage_today / (account.daily_limit || 1) : 0
   const remaining = account ? account.daily_limit - account.usage_today : null

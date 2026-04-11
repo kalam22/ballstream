@@ -565,6 +565,29 @@ func buildMux(lastModified time.Time) (http.Handler, error) {
 	mux.HandleFunc("/api/v1/upstreams", handlers.GetUpstreams)
 	mux.HandleFunc("/api/v1/match/", handlers.GetMatchDetail)
 	
+	// User Management routes (admin only)
+	mux.HandleFunc("/api/v1/users", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			handlers.GetUsers(w, r)
+		} else if r.Method == http.MethodPost {
+			handlers.CreateUser(w, r)
+		} else {
+			handlers.WriteError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
+		}
+	})
+	mux.HandleFunc("/api/v1/users/", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			handlers.GetUser(w, r)
+		case http.MethodPut, http.MethodPatch:
+			handlers.UpdateUser(w, r)
+		case http.MethodDelete:
+			handlers.DeleteUser(w, r)
+		default:
+			handlers.WriteError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed")
+		}
+	})
+	
 	// Legacy API routes (backward compatibility - alias to v1)
 	mux.HandleFunc("/api/matches", handlers.APIProxy)
 	mux.HandleFunc("/api/bootstrap", handlers.GetBootstrap)

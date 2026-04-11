@@ -11,6 +11,11 @@ import (
 
 var DB *sql.DB
 
+// GetJWTSecret returns the JWT secret from environment
+func GetJWTSecret() string {
+	return os.Getenv("JWT_SECRET")
+}
+
 func InitDB() {
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {

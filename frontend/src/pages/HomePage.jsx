@@ -1,100 +1,15 @@
 import { useState, useMemo } from 'react'
 import Navbar from '../components/Navbar.jsx'
-import MatchRow from '../components/MatchRow.jsx'
-import { SkeletonGrid, Notice, EmptyState } from '../components/UI.jsx'
-import { SearchIcon } from '../components/Icons.jsx'
+import MatchFilters from '../components/home/MatchFilters.jsx'
+import MatchSearch from '../components/home/MatchSearch.jsx'
+import MatchList from '../components/home/MatchList.jsx'
+import MatchSidebar from '../components/home/MatchSidebar.jsx'
 import { useData } from '../context/DataContext.jsx'
 import { useMatches, useDebounce } from '../hooks/useApi.js'
 import { formatDate } from '../utils/format.js'
-import { 
-  Trophy, 
-  Calendar, 
-  TrendingUp, 
-  Search,
-  RefreshCw,
-  AlertCircle,
-  Inbox
-} from 'lucide-react'
 
 const STATUS_ORDER = { live: 1, upcoming: 2, finished: 3 }
 const today = formatDate(new Date())
-
-function CompactMatchCard({ match }) {
-  const [imageLoaded, setImageLoaded] = useState(false)
-  const parts = (match.start_time || '').split(' ')
-  const dateStr = parts.length >= 3 ? `${parts[1]?.toUpperCase()} ${parts[0]}` : match.start_time
-  const hScore = match.home_score ?? 0
-  const aScore = match.away_score ?? 0
-  const hWon = hScore > aScore
-  const aWon = aScore > hScore
-
-  return (
-    <a href={`/match/${encodeURIComponent(match.id)}`} className="compact-card">
-      <div className="cc-header">
-        <span className="cc-league" title={match.league}>{match.league || '—'}</span>
-        <span className="cc-date">{dateStr}</span>
-      </div>
-      <div className="cc-body">
-        <div className="cc-row">
-          <div className="cc-team-left">
-            <div style={{ position: 'relative', width: '24px', height: '24px' }}>
-              {!imageLoaded && (
-                <div style={{ 
-                  width: '24px', 
-                  height: '24px', 
-                  background: 'var(--bg-secondary)', 
-                  borderRadius: '50%',
-                  animation: 'shimmer 1.5s infinite'
-                }} />
-              )}
-              <img 
-                src={match.home_team?.logo} 
-                alt={match.home_team?.name || 'Home team'} 
-                className="cc-logo" 
-                width="24"
-                height="24"
-                loading="lazy"
-                style={{ display: imageLoaded ? 'block' : 'none' }}
-                onLoad={() => setImageLoaded(true)}
-                onError={e => e.target.style.display='none'} 
-              />
-            </div>
-            <span className="cc-name" title={match.home_team?.name}>{match.home_team?.name}</span>
-          </div>
-          <span className={`cc-score ${hWon ? 'win' : ''}`}>{hScore}</span>
-        </div>
-        <div className="cc-row">
-          <div className="cc-team-left">
-            <div style={{ position: 'relative', width: '24px', height: '24px' }}>
-              {!imageLoaded && (
-                <div style={{ 
-                  width: '24px', 
-                  height: '24px', 
-                  background: 'var(--bg-secondary)', 
-                  borderRadius: '50%',
-                  animation: 'shimmer 1.5s infinite'
-                }} />
-              )}
-              <img 
-                src={match.away_team?.logo} 
-                alt={match.away_team?.name || 'Away team'} 
-                className="cc-logo" 
-                width="24"
-                height="24"
-                loading="lazy"
-                style={{ display: imageLoaded ? 'block' : 'none' }}
-                onLoad={() => setImageLoaded(true)}
-                onError={e => e.target.style.display='none'} 
-              />
-            </div>
-            <span className="cc-name" title={match.away_team?.name}>{match.away_team?.name}</span>
-          </div>
-          <span className={`cc-score ${aWon ? 'win' : ''}`}>{aScore}</span>
-        </div>
-      </div>
-    </a>
-  )
-}
 
 export default function HomePage() {
   const { sports, refreshCfg } = useData()
@@ -138,13 +53,6 @@ export default function HomePage() {
     return matches.filter(m => m.status === 'finished').slice(0, 15)
   }, [matches])
 
-  const handleSport = (id) => {
-    setActiveSport(id)
-    try { localStorage.setItem('ks-sport', id) } catch {}
-  }
-
-  const allSports = [{ id: 'all', name: 'Semua', icon: <Trophy size={16} /> }, ...sports]
-
   return (
     <>
       <Navbar activePage="home" countdown={countdown} />
@@ -169,173 +77,31 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Main Tabs */}
-        <div className="main-tabs">
-          <button onClick={() => setStatusFilter('live')} className={statusFilter === 'live' ? 'active' : ''}>
-            LIVE <span className="count">{counts.live}</span>
-          </button>
-          <button onClick={() => setStatusFilter('upcoming')} className={statusFilter === 'upcoming' ? 'active' : ''}>
-            SCHEDULE <span className="count">{counts.upcoming}</span>
-          </button>
-          <button onClick={() => setStatusFilter('finished')} className={statusFilter === 'finished' ? 'active' : ''}>
-            FINISHED <span className="count">{counts.finished}</span>
-          </button>
-        </div>
+        {/* Filters & Search */}
+        <MatchFilters 
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+          counts={counts}
+          leagueFilter={leagueFilter}
+          setLeagueFilter={setLeagueFilter}
+          leagues={leagues}
+        />
 
-        {/* League Chips */}
-        <div className="league-chips-scroll">
-          <button
-            className={`league-chip ${leagueFilter === 'all' ? 'active' : ''}`}
-            onClick={() => setLeagueFilter('all')}
-          >
-            All Leagues
-          </button>
-          {leagues.filter(l => l !== 'all').map(l => (
-            <button
-              key={l}
-              className={`league-chip ${leagueFilter === l ? 'active' : ''}`}
-              onClick={() => setLeagueFilter(l)}
-            >
-              {l}
-            </button>
-          ))}
-        </div>
-
-        {/* Search */}
-        <div style={{ marginBottom: '24px' }}>
-          <div className="search-wrap">
-            <SearchIcon />
-            <input
-              type="search"
-              className="search-input"
-              placeholder="Cari tim atau liga..."
-              value={searchRaw}
-              onChange={e => setSearchRaw(e.target.value)}
-              aria-label="Cari pertandingan"
-              autoComplete="off"
-            />
-          </div>
-        </div>
+        <MatchSearch 
+          searchRaw={searchRaw}
+          setSearchRaw={setSearchRaw}
+        />
 
         {/* Match Grid & Sidebar Layout */}
         <div className="home-layout">
-          {/* LATEST RESULTS SIDEBAR */}
-          <aside className="home-sidebar left-sidebar">
-            <h3 className="sidebar-title">
-              <span className="green-bar"></span>LATEST RESULTS
-            </h3>
-            {finishedMatches.length > 0 ? (
-              <div className="compact-list">
-                {finishedMatches.map(m => <CompactMatchCard key={m.id} match={m} />)}
-              </div>
-            ) : (
-              <div className="empty-sidebar">Belum ada hasil pertandingan.</div>
-            )}
-          </aside>
-
-          {/* MAIN LIST */}
+          <MatchSidebar finishedMatches={finishedMatches} />
+          
           <div className="home-main">
-            {error ? (
-              <div style={{ 
-                padding: '3rem 2rem', 
-                textAlign: 'center', 
-                background: 'var(--bg-card)', 
-                borderRadius: 'var(--radius-lg)', 
-                border: '2px solid var(--border)' 
-              }}>
-                <div style={{ 
-                  display: 'inline-flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  width: '64px', 
-                  height: '64px', 
-                  background: 'var(--red-dim)', 
-                  borderRadius: '50%', 
-                  marginBottom: '1.5rem' 
-                }}>
-                  <AlertCircle size={32} color="var(--red)" />
-                </div>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '0.5rem', color: 'var(--text)' }}>
-                  Jadwal Belum Bisa Dimuat
-                </h3>
-                <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.95rem' }}>
-                  Terjadi gangguan saat mengambil data. Coba refresh beberapa saat lagi.
-                </p>
-                <button
-                  onClick={() => window.location.reload()}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.75rem 1.5rem',
-                    background: 'var(--accent)',
-                    color: '#0f172a',
-                    border: 'none',
-                    borderRadius: 'var(--radius)',
-                    fontSize: '0.95rem',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    transition: 'var(--transition)'
-                  }}
-                  onMouseOver={e => e.target.style.transform = 'translateY(-2px)'}
-                  onMouseOut={e => e.target.style.transform = 'translateY(0)'}
-                >
-                  <RefreshCw size={18} />
-                  Coba Lagi
-                </button>
-              </div>
-            ) : loading ? (
-              <SkeletonGrid count={6} />
-            ) : filtered.length === 0 ? (
-              <div style={{ 
-                padding: '3rem 2rem', 
-                textAlign: 'center', 
-                background: 'var(--bg-card)', 
-                borderRadius: 'var(--radius-lg)', 
-                border: '2px solid var(--border)' 
-              }}>
-                <div style={{ 
-                  display: 'inline-flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  width: '64px', 
-                  height: '64px', 
-                  background: 'var(--bg-secondary)', 
-                  borderRadius: '50%', 
-                  marginBottom: '1.5rem' 
-                }}>
-                  <Inbox size={32} color="var(--text-muted)" />
-                </div>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '0.5rem', color: 'var(--text)' }}>
-                  Tidak Ada Pertandingan
-                </h3>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
-                  Coba ubah filter atau kata kunci pencarian.
-                </p>
-              </div>
-            ) : (
-              <div className="league-grouped-list">
-                {Object.entries(
-                  filtered.reduce((acc, m) => {
-                    const l = m.league || 'Lainnya'
-                    if (!acc[l]) acc[l] = []
-                    acc[l].push(m)
-                    return acc
-                  }, {})
-                )
-                .sort(([a], [b]) => a.localeCompare(b))
-                .map(([leagueName, leagueMatches]) => (
-                  <div key={leagueName} className="league-group">
-                    <h2 className="league-header">{leagueName.toUpperCase()}</h2>
-                    <div className="league-matches">
-                      {leagueMatches.map((m, i) => (
-                        <MatchRow key={m.id} match={m} idx={i} />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <MatchList 
+              error={error}
+              loading={loading}
+              filtered={filtered}
+            />
           </div>
         </div>
       </main>

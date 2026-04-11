@@ -3,7 +3,8 @@ import { useData } from '../context/DataContext.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { SunIcon, MoonIcon } from './Icons.jsx'
 import { formatCountdown } from '../utils/format.js'
-import { AlertTriangle, LogOut, User } from 'lucide-react'
+import { AlertTriangle, LogOut, User, Settings } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
 
 function ThemeToggle() {
   const { theme, toggle } = useTheme()
@@ -19,15 +20,23 @@ function ThemeToggle() {
   )
 }
 
-/**
- * Navbar component.
- * Props:
- *   - activePage: 'home' | 'status' | 'match'
- *   - countdown: number | null (seconds remaining for auto-refresh)
- */
 export default function Navbar({ activePage, countdown }) {
   const { account } = useData()
   const { user, isAuthenticated, logout } = useAuth()
+  const [showDropdown, setShowDropdown] = useState(false)
+  const dropdownRef = useRef(null)
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowDropdown(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const remaining = account ? account.daily_limit - account.usage_today : null
   const ratio = account ? account.usage_today / (account.daily_limit || 1) : 0
@@ -51,7 +60,12 @@ export default function Navbar({ activePage, countdown }) {
             </a>
             <nav className="nav-links" aria-label="Main navigation">
               <a href="/" className={activePage === 'home' ? 'active' : ''}>Beranda</a>
-              <a href="/status" className={activePage === 'status' ? 'active' : ''}>Status</a>
+              {user?.role === 'super_admin' && (
+                <>
+                  <a href="/users" className={activePage === 'users' ? 'active' : ''}>Users</a>
+                  <a href="/status" className={activePage === 'status' ? 'active' : ''}>Status</a>
+                </>
+              )}
             </nav>
           </div>
 
@@ -75,6 +89,49 @@ export default function Navbar({ activePage, countdown }) {
                 <span className="refresh-dot" />
                 {formatCountdown(countdown)}
               </span>
+            )}
+
+            {/* User dropdown menu */}
+            {isAuthenticated && user && (
+              <div className="user-dropdown" ref={dropdownRef}>
+                <button 
+                  className="user-dropdown-trigger"
+                  onClick={() => setShowDropdown(!showDropdown)}
+                  aria-label="User menu"
+                >
+                  <User size={20} />
+                </button>
+
+                {showDropdown && (
+                  <div className="user-dropdown-menu">
+                    <div className="dropdown-header">
+                      <User size={16} />
+                      <div className="dropdown-user-info">
+                        <span className="dropdown-email">{user.email}</span>
+                        <span className={`dropdown-role role-${user.role}`}>
+                          {user.role === 'super_admin' ? 'Super Admin' : 'User'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="dropdown-divider"></div>
+                    <a href="/profile" className="dropdown-item">
+                      <Settings size={16} />
+                      <span>Lihat Profil</span>
+                    </a>
+                    <div className="dropdown-divider"></div>
+                    <button 
+                      className="dropdown-item dropdown-logout"
+                      onClick={() => {
+                        logout()
+                        window.location.href = '/login'
+                      }}
+                    >
+                      <LogOut size={16} />
+                      <span>Logout</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
 
             <ThemeToggle />

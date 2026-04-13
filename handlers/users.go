@@ -150,8 +150,9 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(req.Password) < 8 {
-		WriteError(w, http.StatusBadRequest, "WEAK_PASSWORD", "Password must be at least 8 characters")
+	// Validate password strength
+	if valid, msg := ValidatePasswordStrength(req.Password); !valid {
+		WriteError(w, http.StatusBadRequest, "WEAK_PASSWORD", msg)
 		return
 	}
 
@@ -231,8 +232,9 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Password != nil {
-		if len(*req.Password) < 8 {
-			WriteError(w, http.StatusBadRequest, "WEAK_PASSWORD", "Password must be at least 8 characters")
+		// Validate password strength
+		if valid, msg := ValidatePasswordStrength(*req.Password); !valid {
+			WriteError(w, http.StatusBadRequest, "WEAK_PASSWORD", msg)
 			return
 		}
 		hash, err := bcrypt.GenerateFromPassword([]byte(*req.Password), bcrypt.DefaultCost)
@@ -353,6 +355,19 @@ func isAdmin(r *http.Request) bool {
 		return false
 	}
 
+	email, _ := claims["sub"].(string)
+	sessionID, _ := claims["session_id"].(string)
+
+	if email == "" || sessionID == "" || database.DB == nil {
+		return false
+	}
+
+	var dbSessionID string
+	err = database.DB.QueryRow("SELECT session_id FROM users WHERE email = $1", email).Scan(&dbSessionID)
+	if err != nil || dbSessionID != sessionID {
+		return false
+	}
+
 	role, ok := claims["role"].(string)
 	// Hanya super_admin yang bisa akses
 	return ok && role == "super_admin"
@@ -379,5 +394,17 @@ func getUserEmailFromToken(r *http.Request) string {
 	}
 
 	email, _ := claims["sub"].(string)
+	sessionID, _ := claims["session_id"].(string)
+
+	if email == "" || sessionID == "" || database.DB == nil {
+		return ""
+	}
+
+	var dbSessionID string
+	err = database.DB.QueryRow("SELECT session_id FROM users WHERE email = $1", email).Scan(&dbSessionID)
+	if err != nil || dbSessionID != sessionID {
+		return ""
+	}
+
 	return email
 }

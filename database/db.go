@@ -17,6 +17,15 @@ func GetJWTSecret() string {
 }
 
 func InitDB() {
+	// Validate JWT_SECRET first (critical for security)
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		log.Fatal("[Security] JWT_SECRET environment variable is required")
+	}
+	if len(jwtSecret) < 32 {
+		log.Fatal("[Security] JWT_SECRET must be at least 32 characters long")
+	}
+	
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
 		log.Println("[DB] No DATABASE_URL provided. Database functionality disabled.")
@@ -48,6 +57,8 @@ func createTables() {
 		role VARCHAR(50) DEFAULT 'admin',
 		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 	);
+	ALTER TABLE users ADD COLUMN IF NOT EXISTS session_id VARCHAR(255);
+	ALTER TABLE users ADD COLUMN IF NOT EXISTS device VARCHAR(255);
 	`
 	if _, err := DB.Exec(query); err != nil {
 		log.Fatalf("[DB] Failed to create users table: %v", err)

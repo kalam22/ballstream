@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Icon } from '../components/Icons';
 import Navbar from '../components/Navbar';
+import { validatePassword, isValidEmail } from '../utils/security';
+import { getCSRFToken } from '../hooks/useApi';
 
 export default function UsersPage() {
   const { token, user } = useAuth();
@@ -16,6 +18,7 @@ export default function UsersPage() {
     password: '',
     role: 'user',
   });
+  const [passwordError, setPasswordError] = useState('');
 
   // Check if current user is super admin
   if (user?.role !== 'super_admin') {
@@ -91,6 +94,22 @@ export default function UsersPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setPasswordError('');
+
+    // Validate email
+    if (!isValidEmail(formData.email)) {
+      setPasswordError('Format email tidak valid');
+      return;
+    }
+
+    // Validate password for new users or when password is being changed
+    if (modalMode === 'create' || formData.password) {
+      const passwordValidation = validatePassword(formData.password);
+      if (!passwordValidation.valid) {
+        setPasswordError(passwordValidation.message);
+        return;
+      }
+    }
 
     try {
       const url = modalMode === 'create' 
@@ -107,11 +126,14 @@ export default function UsersPage() {
             role: formData.role !== selectedUser.role ? formData.role : undefined,
           };
 
+      const csrfToken = await getCSRFToken();
+
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
+          ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {})
         },
         body: JSON.stringify(body),
       });
@@ -135,10 +157,13 @@ export default function UsersPage() {
     }
 
     try {
+      const csrfToken = await getCSRFToken();
+
       const response = await fetch(`/api/v1/users/${userId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
+          ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {})
         },
       });
 
@@ -201,60 +226,74 @@ export default function UsersPage() {
           </div>
         )}
 
-        <div className="users-table-container">
-          <table className="users-table">
-            <thead>
-              <tr>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Dibuat</th>
-                <th>Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((user) => (
-                <tr key={user.id}>
-                  <td>
-                    <div className="user-email">
-                      <Icon name="user" size={16} />
-                      {user.email}
-                    </div>
-                  </td>
-                  <td>
-                    <span className={`role-badge role-${user.role}`}>
-                      {user.role}
-                    </span>
-                  </td>
-                  <td>{new Date(user.created_at).toLocaleDateString('id-ID')}</td>
-                  <td>
-                    <div className="action-buttons">
-                      <button
-                        className="btn-icon"
-                        onClick={() => handleEdit(user)}
-                        title="Edit"
-                      >
-                        <Icon name="edit" size={16} />
-                      </button>
-                      <button
-                        className="btn-icon btn-danger"
-                        onClick={() => handleDelete(user.id)}
-                        title="Hapus"
-                      >
-                        <Icon name="trash" size={16} />
-                      </button>
-                    </div>
-                  </td>
+        <div className="data-table-container">
+          <div className="data-table-wrapper">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '40%' }}>EMAIL</th>
+                  <th style={{ width: '20%' }}>ROLE</th>
+                  <th style={{ width: '25%' }}>DIBUAT</th>
+                  <th style={{ width: '15%', textAlign: 'center' }}>AKSI</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {users.length === 0 && (
-            <div className="empty-state">
-              <Icon name="users" size={48} />
-              <p>Belum ada user</p>
-            </div>
-          )}
+              </thead>
+              <tbody>
+                {users.length === 0 ? (
+                  <tr>
+                    <td colSpan="4" style={{ textAlign: 'center', padding: '3rem' }}>
+                      <div className="empty-state">
+                        <Icon name="users" size={48} />
+                        <p>Belum ada user</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  users.map((user) => (
+                    <tr key={user.id}>
+                      <td>
+                        <div className="user-email-cell">
+                          <Icon name="user" size={16} />
+                          <span className="email-text" title={user.email}>{user.email}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`role-badge role-${user.role}`}>
+                          {user.role === 'super_admin' ? 'SUPER_ADMIN' : 'USER'}
+                        </span>
+                      </td>
+                      <td>
+                        <span className="date-text">
+                          {new Date(user.created_at).toLocaleDateString('id-ID', {
+                            day: 'numeric',
+                            month: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="action-buttons">
+                          <button
+                            className="btn-icon btn-edit"
+                            onClick={() => handleEdit(user)}
+                            title="Edit User"
+                          >
+                            <Icon name="edit" size={16} />
+                          </button>
+                          <button
+                            className="btn-icon btn-delete"
+                            onClick={() => handleDelete(user.id)}
+                            title="Hapus User"
+                          >
+                            <Icon name="trash" size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -271,6 +310,13 @@ export default function UsersPage() {
 
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
+                {passwordError && (
+                  <div className="alert alert-error" style={{ marginBottom: '1rem' }}>
+                    <Icon name="alert-circle" size={20} />
+                    {passwordError}
+                  </div>
+                )}
+                
                 <div className="form-group">
                   <label>Email</label>
                   <input
@@ -289,8 +335,7 @@ export default function UsersPage() {
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     required={modalMode === 'create'}
-                    placeholder="Minimal 8 karakter"
-                    minLength={8}
+                    placeholder="Masukkan Password Baru"
                   />
                 </div>
 

@@ -464,8 +464,8 @@ func apiKeyMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Auth endpoints are always public (no API key needed)
-		if strings.HasPrefix(r.URL.Path, "/api/auth/") {
+		// Auth endpoints are always public (no API key needed) - they self-authenticate
+		if strings.HasPrefix(r.URL.Path, "/api/auth/") || strings.HasPrefix(r.URL.Path, "/api/v1/auth/") {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -509,7 +509,18 @@ func apiKeyMiddleware(next http.Handler) http.Handler {
 				return []byte(os.Getenv("JWT_SECRET")), nil
 			})
 			if token != nil && token.Valid {
-				hasValidJWT = true
+				if claims, ok := token.Claims.(jwt.MapClaims); ok {
+					email, _ := claims["sub"].(string)
+					sessionID, _ := claims["session_id"].(string)
+					
+					if email != "" && sessionID != "" && database.DB != nil {
+						var dbSessionID string
+						err := database.DB.QueryRow("SELECT session_id FROM users WHERE email = $1", email).Scan(&dbSessionID)
+						if err == nil && dbSessionID == sessionID {
+							hasValidJWT = true
+						}
+					}
+				}
 			}
 		}
 
@@ -558,6 +569,16 @@ func buildMux(lastModified time.Time) (http.Handler, error) {
 
 	// API v1 routes (versioned)
 	mux.HandleFunc("/api/v1/auth/login", handlers.HandleLogin)
+	mux.HandleFunc("/api/v1/auth/verify", handlers.HandleVerifySession)
+	mux.HandleFunc("/api/v1/auth/logout", handlers.HandleLogout)
+	mux.HandleFunc("/api/v1/auth/csrf", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			handlers.WriteError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method must be GET")
+			return
+		}
+		token := handlers.GenerateCSRFToken()
+		handlers.WriteSuccess(w, map[string]string{"csrf_token": token})
+	})
 	mux.HandleFunc("/api/v1/matches", handlers.APIProxy)
 	mux.HandleFunc("/api/v1/bootstrap", handlers.GetBootstrap)
 	mux.HandleFunc("/api/v1/account", handlers.GetAccount)
@@ -607,11 +628,12 @@ func buildMux(lastModified time.Time) (http.Handler, error) {
 		w.Write([]byte(`{"status":"ok","message":"Backend API server running. Frontend runs on http://localhost:5173","version":"v1"}`))
 	})
 
-	// Apply middlewares: mux -> gzip -> body limit -> API auth -> rate limit -> security headers -> CORS -> request ID -> logging
+	// Apply middlewares: mux -> gzip -> body limit -> API auth -> CSRF -> rate limit -> security headers -> CORS -> request ID -> logging
 	compressedMux := gzipMiddleware(mux)
 	limitedMux := requestBodyLimitMiddleware(1<<20, compressedMux)
 	authMux := apiKeyMiddleware(limitedMux)
-	rateLimitedMux := rateLimitMiddleware(authMux)
+	csrfMux := handlers.CSRFMiddleware(authMux)
+	rateLimitedMux := rateLimitMiddleware(csrfMux)
 	securedMux := securityHeadersMiddleware(rateLimitedMux)
 	corsMux := corsMiddleware(securedMux)
 	requestIDMux := requestIDMiddleware(corsMux)
@@ -626,6 +648,9 @@ func main() {
 
 	// Initialize the Database (this connects and seeds the initial users if empty)
 	database.InitDB()
+
+	// Start cleanup goroutines
+	handlers.CleanupExpiredCSRFTokens()
 
 	// Start background cache updater
 	log.Println("Starting cache updater...")

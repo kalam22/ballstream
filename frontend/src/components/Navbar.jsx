@@ -3,8 +3,9 @@ import { useData } from '../context/DataContext.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { SunIcon, MoonIcon } from './Icons.jsx'
 import { formatCountdown } from '../utils/format.js'
-import { AlertTriangle, LogOut, User, Settings } from 'lucide-react'
+import { AlertTriangle, LogOut, User, Settings, Menu, X } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
+import Swal from 'sweetalert2'
 
 function ThemeToggle() {
   const { theme, toggle } = useTheme()
@@ -24,6 +25,7 @@ export default function Navbar({ activePage, countdown }) {
   const { account } = useData()
   const { user, isAuthenticated, logout } = useAuth()
   const [showDropdown, setShowDropdown] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const dropdownRef = useRef(null)
 
   // Close dropdown when clicking outside
@@ -58,12 +60,12 @@ export default function Navbar({ activePage, countdown }) {
               <span className="logo-dot" />
               kana.stream
             </a>
-            <nav className="nav-links" aria-label="Main navigation">
-              <a href="/" className={activePage === 'home' ? 'active' : ''}>Beranda</a>
+            <nav className={`nav-links ${mobileMenuOpen ? 'open' : ''}`} aria-label="Main navigation">
+              <a href="/" className={activePage === 'home' ? 'active' : ''} onClick={() => setMobileMenuOpen(false)}>Beranda</a>
               {user?.role === 'super_admin' && (
                 <>
-                  <a href="/users" className={activePage === 'users' ? 'active' : ''}>Users</a>
-                  <a href="/status" className={activePage === 'status' ? 'active' : ''}>Status</a>
+                  <a href="/users" className={activePage === 'users' ? 'active' : ''} onClick={() => setMobileMenuOpen(false)}>Users</a>
+                  <a href="/status" className={activePage === 'status' ? 'active' : ''} onClick={() => setMobileMenuOpen(false)}>Status</a>
                 </>
               )}
             </nav>
@@ -121,8 +123,16 @@ export default function Navbar({ activePage, countdown }) {
                     <div className="dropdown-divider"></div>
                     <button 
                       className="dropdown-item dropdown-logout"
-                      onClick={() => {
-                        logout()
+                      onClick={async () => {
+                        await logout()
+                        await Swal.fire({
+                          title: 'Berhasil Logout',
+                          text: 'Sesi Anda telah dihapus dengan aman.',
+                          icon: 'success',
+                          confirmButtonColor: '#02ff97',
+                          timer: 2000,
+                          showConfirmButton: false
+                        });
                         window.location.href = '/login'
                       }}
                     >
@@ -135,6 +145,14 @@ export default function Navbar({ activePage, countdown }) {
             )}
 
             <ThemeToggle />
+
+            <button 
+              className="mobile-menu-btn"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
           </div>
         </div>
       </header>

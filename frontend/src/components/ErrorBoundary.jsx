@@ -12,14 +12,8 @@ export class ErrorBoundary extends Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('Error caught by boundary:', error, errorInfo)
-    
-    // Ignore errors during initial loading/mounting
-    if (error?.message?.includes('Cannot read properties of null')) {
-      console.warn('Ignoring null reference during mount')
-      this.setState({ hasError: false, error: null })
-      return
-    }
   }
+
 
   render() {
     if (this.state.hasError) {

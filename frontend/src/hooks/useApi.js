@@ -3,12 +3,42 @@ import { useState, useEffect, useCallback } from 'react'
 // Get API key from environment variable (optional)
 const API_KEY = import.meta.env.VITE_API_KEY || ''
 
-// Helper to add API key to requests (only if API_KEY is set)
-const fetchWithAuth = (url, options = {}) => {
+// CSRF token cache
+let csrfToken = null
+
+// Get CSRF token from server
+export const getCSRFToken = async () => {
+  if (csrfToken) return csrfToken
+  
+  try {
+    const response = await fetch('/api/v1/auth/csrf')
+    const data = await response.json()
+    csrfToken = data.data?.csrf_token || data.csrf_token
+    return csrfToken
+  } catch (err) {
+    console.error('[CSRF] Failed to get token:', err)
+    return null
+  }
+}
+
+// Helper to add API key and CSRF token to requests
+const fetchWithAuth = async (url, options = {}) => {
   const headers = { ...options.headers }
+  
+  // Add API key if available
   if (API_KEY) {
     headers['X-API-Key'] = API_KEY
   }
+  
+  // Add CSRF token for state-changing requests
+  const method = options.method?.toUpperCase() || 'GET'
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    const token = await getCSRFToken()
+    if (token) {
+      headers['X-CSRF-Token'] = token
+    }
+  }
+  
   return fetch(url, {
     ...options,
     headers

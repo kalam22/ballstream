@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Icon } from '../components/Icons'
 import { Lock, Mail, Eye, EyeOff } from 'lucide-react'
+import Swal from 'sweetalert2'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -19,6 +20,27 @@ export default function LoginPage() {
     const res = await login(email, password)
     if (res.success) {
       window.location.href = '/'
+    } else if (res.code === 'ALREADY_LOGGED_IN') {
+      setIsLoading(false)
+      await Swal.fire({
+        title: '⚠️ Akun Sedang Aktif',
+        html: `
+          <p style="color: var(--text-soft, #334155); font-size: 0.95rem; line-height: 1.6; margin-bottom: 0.5rem;">
+            Akun <strong>${email}</strong> saat ini sedang aktif di perangkat lain.
+          </p>
+          <p style="color: var(--text-muted, #64748b); font-size: 0.875rem;">
+            Silakan keluar terlebih dahulu dari perangkat tersebut sebelum login di sini.
+          </p>
+        `,
+        icon: 'warning',
+        confirmButtonText: 'Mengerti',
+        confirmButtonColor: '#02ff97',
+        background: document.documentElement.getAttribute('data-theme') === 'dark' ? '#1a2332' : '#ffffff',
+        color: document.documentElement.getAttribute('data-theme') === 'dark' ? '#f1f5f9' : '#0f172a',
+        customClass: {
+          confirmButton: 'swal-confirm-btn',
+        },
+      })
     } else {
       setError(res.error || 'Email atau password salah. Silakan coba lagi.')
       setIsLoading(false)
@@ -124,15 +146,6 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              <div className="form-footer">
-                <label className="remember-me">
-                  <input type="checkbox" />
-                  <span>Ingat saya</span>
-                </label>
-                <a href="#" className="forgot-password">
-                  Lupa password?
-                </a>
-              </div>
 
               <button
                 type="submit"
@@ -150,18 +163,6 @@ export default function LoginPage() {
               </button>
             </form>
 
-            <div className="login-divider">
-              <span>atau</span>
-            </div>
-
-            <div className="login-footer">
-              <p>
-                Belum punya akun?{' '}
-                <a href="#" className="signup-link">
-                  Daftar sekarang
-                </a>
-              </p>
-            </div>
           </div>
         </div>
       </div>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Icon } from '../components/Icons';
 import Navbar from '../components/Navbar';
+import { validatePassword } from '../utils/security';
 
 export default function ProfilePage() {
   const { token, user, logout } = useAuth();
@@ -19,9 +20,10 @@ export default function ProfilePage() {
     setError(null);
     setSuccess(false);
 
-    // Validasi
-    if (formData.newPassword.length < 8) {
-      setError('Password baru minimal 8 karakter');
+    // Validasi password strength
+    const passwordValidation = validatePassword(formData.newPassword);
+    if (!passwordValidation.valid) {
+      setError(passwordValidation.message);
       return;
     }
 
@@ -77,8 +79,8 @@ export default function ProfilePage() {
       });
 
       // Auto logout after 2 seconds
-      setTimeout(() => {
-        logout();
+      setTimeout(async () => {
+        await logout();
         window.location.href = '/login';
       }, 2000);
 
@@ -132,10 +134,13 @@ export default function ProfilePage() {
                   value={formData.newPassword}
                   onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
                   required
-                  placeholder="Minimal 8 karakter"
+                  placeholder="Masukkan Password Baru"
                   minLength={8}
                   disabled={loading}
                 />
+                <small style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '0.25rem', display: 'block' }}>
+                  Masukkan Password Baru
+                </small>
               </div>
 
               <div className="form-group">
@@ -152,8 +157,8 @@ export default function ProfilePage() {
               </div>
 
               <div className="form-actions">
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   className="btn btn-primary"
                   disabled={loading}
                 >

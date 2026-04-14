@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import Swal from 'sweetalert2';
+import { swal } from '../utils/swal';
 
 const AuthContext = createContext();
 
@@ -128,29 +128,11 @@ export function AuthProvider({ children }) {
           const code = data?.error?.code;
           if (code === 'SESSION_INVALIDATED' || code === 'TOKEN_EXPIRED' || res.status === 401) {
             console.warn('[Auth] Session invalidated – logging out');
-            // Stop polling immediately to prevent duplicate alerts
             if (sessionPollRef.current) {
               clearInterval(sessionPollRef.current);
               sessionPollRef.current = null;
             }
-            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-            await Swal.fire({
-              title: '🔒 Sesi Berakhir',
-              html: `
-                <p style="font-size: 0.95rem; line-height: 1.6; margin-bottom: 0.5rem;">
-                  Akun Anda baru saja login di perangkat lain.
-                </p>
-                <p style="font-size: 0.875rem; opacity: 0.75;">
-                  Sesi di perangkat ini telah diakhiri secara otomatis.
-                </p>
-              `,
-              icon: 'info',
-              confirmButtonText: 'Login Kembali',
-              confirmButtonColor: '#02ff97',
-              background: isDark ? '#1a2332' : '#ffffff',
-              color: isDark ? '#f1f5f9' : '#0f172a',
-              allowOutsideClick: false,
-            });
+            await swal.sessionEnded();
             logout();
             window.location.href = '/login';
           }

@@ -23,9 +23,6 @@ import (
 	"time"
 )
 
-// ... previous code ...
-// [Logic from hardening.go starts here]
-
 type rateLimitGroupConfig struct {
 	rps   float64
 	burst float64

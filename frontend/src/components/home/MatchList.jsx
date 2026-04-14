@@ -1,8 +1,37 @@
+import { memo, useMemo } from 'react'
 import { AlertCircle, RefreshCw, Inbox } from 'lucide-react'
 import { SkeletonGrid } from '../UI'
 import MatchRow from '../MatchRow'
 
+// Group and sort matches by league — memoized to avoid re-computation on every render
+function useGroupedMatches(filtered) {
+  return useMemo(() => {
+    const grouped = {}
+    for (const m of filtered) {
+      const l = m.league || 'Lainnya'
+      if (!grouped[l]) grouped[l] = []
+      grouped[l].push(m)
+    }
+    return Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b))
+  }, [filtered])
+}
+
+const LeagueGroup = memo(function LeagueGroup({ leagueName, leagueMatches }) {
+  return (
+    <div className="league-group">
+      <h2 className="league-header">{leagueName.toUpperCase()}</h2>
+      <div className="league-matches">
+        {leagueMatches.map((m, i) => (
+          <MatchRow key={m.id} match={m} idx={i} />
+        ))}
+      </div>
+    </div>
+  )
+})
+
 export default function MatchList({ error, loading, filtered }) {
+  const groupedMatches = useGroupedMatches(filtered)
+
   if (error) {
     return (
       <div style={{ 
@@ -46,8 +75,8 @@ export default function MatchList({ error, loading, filtered }) {
             cursor: 'pointer',
             transition: 'var(--transition)'
           }}
-          onMouseOver={e => e.target.style.transform = 'translateY(-2px)'}
-          onMouseOut={e => e.target.style.transform = 'translateY(0)'}
+          onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+          onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
         >
           <RefreshCw size={18} />
           Coba Lagi
@@ -93,24 +122,8 @@ export default function MatchList({ error, loading, filtered }) {
 
   return (
     <div className="league-grouped-list">
-      {Object.entries(
-        filtered.reduce((acc, m) => {
-          const l = m.league || 'Lainnya'
-          if (!acc[l]) acc[l] = []
-          acc[l].push(m)
-          return acc
-        }, {})
-      )
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([leagueName, leagueMatches]) => (
-        <div key={leagueName} className="league-group">
-          <h2 className="league-header">{leagueName.toUpperCase()}</h2>
-          <div className="league-matches">
-            {leagueMatches.map((m, i) => (
-              <MatchRow key={m.id} match={m} idx={i} />
-            ))}
-          </div>
-        </div>
+      {groupedMatches.map(([leagueName, leagueMatches]) => (
+        <LeagueGroup key={leagueName} leagueName={leagueName} leagueMatches={leagueMatches} />
       ))}
     </div>
   )

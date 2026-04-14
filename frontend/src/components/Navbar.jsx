@@ -5,7 +5,7 @@ import { SunIcon, MoonIcon } from './Icons.jsx'
 import { formatCountdown } from '../utils/format.js'
 import { AlertTriangle, LogOut, User, Settings, Menu, X } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
-import Swal from 'sweetalert2'
+import { swal } from '../utils/swal'
 
 function ThemeToggle() {
   const { theme, toggle } = useTheme()
@@ -125,14 +125,11 @@ export default function Navbar({ activePage, countdown }) {
                       className="dropdown-item dropdown-logout"
                       onClick={async () => {
                         await logout()
-                        await Swal.fire({
+                        await swal.success({
                           title: 'Berhasil Logout',
-                          text: 'Sesi Anda telah dihapus dengan aman.',
-                          icon: 'success',
-                          confirmButtonColor: '#02ff97',
+                          text: 'Anda telah logout. Terima kasih!',
                           timer: 2000,
-                          showConfirmButton: false
-                        });
+                        })
                         window.location.href = '/login'
                       }}
                     >

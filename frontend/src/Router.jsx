@@ -21,7 +21,7 @@ function getRoute(pathname) {
 }
 
 export default function Router() {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
   const [route, setRoute] = useState(() => getRoute(window.location.pathname))
 
   useEffect(() => {
@@ -36,6 +36,7 @@ export default function Router() {
       if (!a) return
       const href = a.getAttribute('href')
       if (!href || href.startsWith('http') || href.startsWith('#') || a.target) return
+      if (a.hasAttribute('download') || a.rel === 'external') return
       e.preventDefault()
       window.history.pushState({}, '', href)
       setRoute(getRoute(href))
@@ -60,9 +61,14 @@ export default function Router() {
   if (route.page === 'home')    return <HomePage />
   if (route.page === 'status')  return <StatusPage />
   if (route.page === 'login')   return <LoginPage />
-  if (route.page === 'users')   return <UsersPage />
   if (route.page === 'profile') return <ProfilePage />
   if (route.page === 'match')   return <MatchPage id={route.id} />
+
+  // Role-guarded routes
+  if (route.page === 'users') {
+    if (user?.role !== 'super_admin') return <NotFoundPage />
+    return <UsersPage />
+  }
 
   return <NotFoundPage />
 }

@@ -41,18 +41,31 @@ export function isValidEmail(email) {
 }
 
 /**
- * Validate password strength
- * Returns { valid: boolean, message: string }
+ * Validate password strength — synced with backend requirements.
+ * Min 8 chars, max 128, must have uppercase, lowercase, digit, special char.
  */
 export function validatePassword(password) {
   if (!password) {
     return { valid: false, message: 'Password tidak boleh kosong' };
   }
-  
+  if (password.length < 8) {
+    return { valid: false, message: 'Password minimal 8 karakter' };
+  }
   if (password.length > 128) {
     return { valid: false, message: 'Password maksimal 128 karakter' };
   }
-  
+  if (!/[A-Z]/.test(password)) {
+    return { valid: false, message: 'Password harus mengandung minimal 1 huruf kapital' };
+  }
+  if (!/[a-z]/.test(password)) {
+    return { valid: false, message: 'Password harus mengandung minimal 1 huruf kecil' };
+  }
+  if (!/[0-9]/.test(password)) {
+    return { valid: false, message: 'Password harus mengandung minimal 1 angka' };
+  }
+  if (!/[^A-Za-z0-9]/.test(password)) {
+    return { valid: false, message: 'Password harus mengandung minimal 1 karakter spesial (!@#$%^&* dll)' };
+  }
   return { valid: true, message: '' };
 }
 

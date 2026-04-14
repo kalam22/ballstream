@@ -59,6 +59,7 @@ func createTables() {
 	);
 	ALTER TABLE users ADD COLUMN IF NOT EXISTS session_id VARCHAR(255);
 	ALTER TABLE users ADD COLUMN IF NOT EXISTS device VARCHAR(255);
+	ALTER TABLE users ADD COLUMN IF NOT EXISTS session_expires_at TIMESTAMP WITH TIME ZONE;
 	`
 	if _, err := DB.Exec(query); err != nil {
 		log.Fatalf("[DB] Failed to create users table: %v", err)

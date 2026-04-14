@@ -4,6 +4,7 @@ import { Icon } from '../components/Icons';
 import Navbar from '../components/Navbar';
 import { validatePassword, isValidEmail } from '../utils/security';
 import { getCSRFToken } from '../hooks/useApi';
+import { swal } from '../utils/swal';
 
 export default function UsersPage() {
   const { token, user } = useAuth();
@@ -146,15 +147,20 @@ export default function UsersPage() {
 
       setShowModal(false);
       fetchUsers();
+      await swal.success({ title: modalMode === 'create' ? 'User berhasil ditambahkan' : 'User berhasil diperbarui' });
     } catch (err) {
-      alert(err.message);
+      await swal.error({ title: 'Gagal menyimpan', text: err.message });
     }
   };
 
   const handleDelete = async (userId) => {
-    if (!confirm('Apakah Anda yakin ingin menghapus user ini?')) {
-      return;
-    }
+    const confirmed = await swal.confirm({
+      title: 'Hapus User?',
+      text: 'Tindakan ini tidak dapat dibatalkan.',
+      confirmText: 'Hapus',
+      cancelText: 'Batal',
+    })
+    if (!confirmed) return;
 
     try {
       const csrfToken = await getCSRFToken();
@@ -174,8 +180,9 @@ export default function UsersPage() {
       }
 
       fetchUsers();
+      await swal.success({ title: 'User berhasil dihapus' });
     } catch (err) {
-      alert(err.message);
+      await swal.error({ title: 'Gagal menghapus', text: err.message });
     }
   };
 

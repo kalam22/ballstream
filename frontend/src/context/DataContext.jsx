@@ -1,19 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-
-// Get API key from environment variable (optional)
-const API_KEY = import.meta.env.VITE_API_KEY || ''
-
-// Helper to add API key to requests (only if API_KEY is set)
-const fetchWithAuth = (url, options = {}) => {
-  const headers = { ...options.headers }
-  if (API_KEY) {
-    headers['X-API-Key'] = API_KEY
-  }
-  return fetch(url, {
-    ...options,
-    headers
-  })
-}
+import { fetchWithAuth } from '../utils/api'
 
 const DataCtx = createContext({
   account: null,

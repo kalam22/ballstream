@@ -39,25 +39,28 @@ func GenerateCSRFToken() string {
 	return token
 }
 
-// ValidateCSRFToken checks if a CSRF token is valid
+// ValidateCSRFToken checks if a CSRF token is valid and invalidates it (single-use)
 func ValidateCSRFToken(token string) bool {
 	if token == "" {
 		return false
 	}
-	
-	csrfMutex.RLock()
-	defer csrfMutex.RUnlock()
-	
+
+	csrfMutex.Lock()
+	defer csrfMutex.Unlock()
+
 	stored, exists := csrfTokens[token]
 	if !exists {
 		return false
 	}
-	
+
 	// Check if token is expired
 	if time.Since(stored.createdAt) > csrfTokenTTL {
+		delete(csrfTokens, token)
 		return false
 	}
-	
+
+	// Single-use: delete after successful validation
+	delete(csrfTokens, token)
 	return true
 }
 

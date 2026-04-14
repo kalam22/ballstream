@@ -17,6 +17,7 @@ const (
 var (
 	cacheMutex       sync.RWMutex
 	matchesCache     []models.Match
+	matchesByID      = map[string]models.Match{} // O(1) lookup by ID
 	accountCache     models.AccountInfo
 	sportsCache      []models.Sport
 	matchDetailCache = map[string]cachedMatchDetail{}
@@ -30,8 +31,14 @@ type cachedMatchDetail struct {
 }
 
 func setMatchesCache(matches []models.Match, reason string) {
+	// Build O(1) lookup index alongside the slice
+	idx := make(map[string]models.Match, len(matches))
+	for _, m := range matches {
+		idx[m.ID] = m
+	}
 	cacheMutex.Lock()
 	matchesCache = matches
+	matchesByID = idx
 	cacheMutex.Unlock()
 	log.Printf("[Cache] matches updated (%s): %d records", reason, len(matches))
 }
@@ -110,11 +117,35 @@ func StartCacheUpdater() {
 
 	wg.Wait()
 	log.Println("[Cache] Initial preload complete.")
-	
+
+	// Warn if starting with empty cache
+	cacheMutex.RLock()
+	emptyMatches := len(matchesCache) == 0
+	cacheMutex.RUnlock()
+	if emptyMatches {
+		log.Println("[Cache] WARNING: Starting with empty match cache — API may be unavailable")
+	}
+
 	// Signal that cache is ready
 	cacheReadyOnce.Do(func() {
 		close(cacheReady)
 	})
+
+	// Evict stale matchDetailCache entries every 5 minutes
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			cutoff := time.Now().Add(-MatchDetailCacheTTL * 10)
+			cacheMutex.Lock()
+			for id, entry := range matchDetailCache {
+				if entry.FetchedAt.Before(cutoff) {
+					delete(matchDetailCache, id)
+				}
+			}
+			cacheMutex.Unlock()
+		}
+	}()
 
 	// Matches: refresh every 30 seconds
 	go func() {
@@ -163,16 +194,12 @@ func GetMatchesFromCache() []models.Match {
 	return matchesCache
 }
 
-// GetMatchByID looks up a single match by ID from the cache.
+// GetMatchByID looks up a single match by ID from the cache in O(1).
 func GetMatchByID(id string) (models.Match, bool) {
 	cacheMutex.RLock()
 	defer cacheMutex.RUnlock()
-	for _, m := range matchesCache {
-		if m.ID == id {
-			return m, true
-		}
-	}
-	return models.Match{}, false
+	m, ok := matchesByID[id]
+	return m, ok
 }
 
 // GetAccountFromCache returns the current cached account info.

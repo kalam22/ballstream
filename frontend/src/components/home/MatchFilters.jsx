@@ -1,6 +1,6 @@
-import { useMemo } from 'react'
+import { memo } from 'react'
 
-export default function MatchFilters({ 
+const MatchFilters = memo(function MatchFilters({ 
   statusFilter, 
   setStatusFilter, 
   counts,
@@ -57,4 +57,6 @@ export default function MatchFilters({
       </div>
     </>
   )
-}
+})
+
+export default MatchFilters

@@ -28,9 +28,10 @@ type CreateUserRequest struct {
 }
 
 type UpdateUserRequest struct {
-	Email    *string `json:"email,omitempty"`
-	Password *string `json:"password,omitempty"`
-	Role     *string `json:"role,omitempty"`
+	Email           *string `json:"email,omitempty"`
+	Password        *string `json:"password,omitempty"`
+	CurrentPassword *string `json:"current_password,omitempty"`
+	Role            *string `json:"role,omitempty"`
 }
 
 // GetUsers returns all users (admin only)
@@ -150,6 +151,12 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate email format
+	if !isValidEmail(req.Email) {
+		WriteError(w, http.StatusBadRequest, "INVALID_EMAIL", "Format email tidak valid")
+		return
+	}
+
 	// Validate password strength
 	if valid, msg := ValidatePasswordStrength(req.Password); !valid {
 		WriteError(w, http.StatusBadRequest, "WEAK_PASSWORD", msg)
@@ -232,7 +239,25 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Password != nil {
-		// Validate password strength
+		// If current_password is provided, verify it before allowing change
+		if req.CurrentPassword != nil && *req.CurrentPassword != "" {
+			var existingHash string
+			hashErr := database.DB.QueryRow("SELECT password_hash FROM users WHERE id = $1", id).Scan(&existingHash)
+			if hashErr != nil {
+				WriteError(w, http.StatusInternalServerError, "DB_ERROR", "Failed to verify current password")
+				return
+			}
+			if bcrypt.CompareHashAndPassword([]byte(existingHash), []byte(*req.CurrentPassword)) != nil {
+				WriteError(w, http.StatusUnauthorized, "WRONG_PASSWORD", "Password saat ini tidak sesuai")
+				return
+			}
+		} else {
+			// current_password wajib saat mengubah password
+			WriteError(w, http.StatusBadRequest, "CURRENT_PASSWORD_REQUIRED", "Password saat ini wajib diisi untuk mengubah password")
+			return
+		}
+
+		// Validate new password strength
 		if valid, msg := ValidatePasswordStrength(*req.Password); !valid {
 			WriteError(w, http.StatusBadRequest, "WEAK_PASSWORD", msg)
 			return

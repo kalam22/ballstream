@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Icon } from '../components/Icons'
 import { Lock, Mail, Eye, EyeOff } from 'lucide-react'
-import Swal from 'sweetalert2'
+import { swal } from '../utils/swal'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -22,26 +22,13 @@ export default function LoginPage() {
       window.location.href = '/'
     } else if (res.code === 'ALREADY_LOGGED_IN') {
       setIsLoading(false)
-      await Swal.fire({
-        title: '⚠️ Akun Sedang Aktif',
-        html: `
-          <p style="color: var(--text-soft, #334155); font-size: 0.95rem; line-height: 1.6; margin-bottom: 0.5rem;">
-            Akun <strong>${email}</strong> saat ini sedang aktif di perangkat lain.
-          </p>
-          <p style="color: var(--text-muted, #64748b); font-size: 0.875rem;">
-            Silakan keluar terlebih dahulu dari perangkat tersebut sebelum login di sini.
-          </p>
-        `,
-        icon: 'warning',
-        confirmButtonText: 'Mengerti',
-        confirmButtonColor: '#02ff97',
-        background: document.documentElement.getAttribute('data-theme') === 'dark' ? '#1a2332' : '#ffffff',
-        color: document.documentElement.getAttribute('data-theme') === 'dark' ? '#f1f5f9' : '#0f172a',
-        customClass: {
-          confirmButton: 'swal-confirm-btn',
-        },
-      })
+      await swal.alreadyLoggedIn(email)
+    } else if (res.code === 'INTERNAL_ERROR' || !res.code) {
+      // Network/server error — show swal
+      setIsLoading(false)
+      await swal.error({ title: 'Gagal Terhubung', text: 'Tidak dapat terhubung ke server. Periksa koneksi Anda.' })
     } else {
+      // Auth error (wrong password, etc) — keep inline for fast feedback
       setError(res.error || 'Email atau password salah. Silakan coba lagi.')
       setIsLoading(false)
     }

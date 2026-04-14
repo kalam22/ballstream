@@ -3,12 +3,11 @@ import { useAuth } from '../context/AuthContext';
 import { Icon } from '../components/Icons';
 import Navbar from '../components/Navbar';
 import { validatePassword } from '../utils/security';
+import { swal } from '../utils/swal';
 
 export default function ProfilePage() {
   const { token, user, logout } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(false);
   const [formData, setFormData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -23,12 +22,12 @@ export default function ProfilePage() {
     // Validasi password strength
     const passwordValidation = validatePassword(formData.newPassword);
     if (!passwordValidation.valid) {
-      setError(passwordValidation.message);
+      await swal.error({ title: 'Password Tidak Valid', text: passwordValidation.message });
       return;
     }
 
     if (formData.newPassword !== formData.confirmPassword) {
-      setError('Password baru dan konfirmasi tidak cocok');
+      await swal.error({ title: 'Password Tidak Cocok', text: 'Password baru dan konfirmasi tidak cocok.' });
       return;
     }
 
@@ -37,23 +36,16 @@ export default function ProfilePage() {
 
       // Get current user ID
       const usersResponse = await fetch('/api/v1/users', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Authorization': `Bearer ${token}` },
       });
 
-      if (!usersResponse.ok) {
-        throw new Error('Gagal mengambil data user');
-      }
+      if (!usersResponse.ok) throw new Error('Gagal mengambil data user');
 
       const usersData = await usersResponse.json();
       const currentUser = usersData.data.find(u => u.email === user.email);
+      if (!currentUser) throw new Error('User tidak ditemukan');
 
-      if (!currentUser) {
-        throw new Error('User tidak ditemukan');
-      }
-
-      // Update password
+      // Update password — kirim currentPassword untuk verifikasi
       const response = await fetch(`/api/v1/users/${currentUser.id}`, {
         method: 'PUT',
         headers: {
@@ -61,31 +53,27 @@ export default function ProfilePage() {
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
+          current_password: formData.currentPassword,
           password: formData.newPassword,
         }),
       });
 
       const data = await response.json();
+      if (!response.ok) throw new Error(data.error?.message || 'Gagal mengubah password');
 
-      if (!response.ok) {
-        throw new Error(data.error?.message || 'Gagal mengubah password');
-      }
+      setFormData({ currentPassword: '', newPassword: '', confirmPassword: '' });
 
-      setSuccess(true);
-      setFormData({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: '',
+      await swal.success({
+        title: 'Password Berhasil Diubah!',
+        text: 'Anda akan logout otomatis dalam 2 detik...',
+        timer: 2000,
       });
 
-      // Auto logout after 2 seconds
-      setTimeout(async () => {
-        await logout();
-        window.location.href = '/login';
-      }, 2000);
+      await logout();
+      window.location.href = '/login';
 
     } catch (err) {
-      setError(err.message);
+      await swal.error({ title: 'Gagal Mengubah Password', text: err.message });
     } finally {
       setLoading(false);
     }
@@ -112,21 +100,19 @@ export default function ProfilePage() {
             <h2>Ubah Password</h2>
             <p className="card-subtitle">Pastikan password baru Anda kuat dan mudah diingat</p>
 
-            {error && (
-              <div className="alert alert-error">
-                <Icon name="alert-circle" size={20} />
-                {error}
-              </div>
-            )}
-
-            {success && (
-              <div className="alert alert-success">
-                <Icon name="check-circle" size={20} />
-                Password berhasil diubah! Anda akan logout otomatis...
-              </div>
-            )}
-
             <form onSubmit={handleSubmit}>
+              <div className="form-group">
+                <label>Password Saat Ini</label>
+                <input
+                  type="password"
+                  value={formData.currentPassword}
+                  onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
+                  required
+                  placeholder="Masukkan password saat ini"
+                  disabled={loading}
+                />
+              </div>
+
               <div className="form-group">
                 <label>Password Baru</label>
                 <input
@@ -197,11 +183,13 @@ export default function ProfilePage() {
           align-items: center;
           justify-content: center;
           color: white;
+          flex-shrink: 0;
         }
 
         .profile-info h1 {
           font-size: 1.5rem;
           margin: 0 0 0.5rem 0;
+          word-break: break-word;
         }
 
         .profile-card {
@@ -219,6 +207,7 @@ export default function ProfilePage() {
         .card-subtitle {
           color: var(--text-secondary);
           margin-bottom: 1.5rem;
+          font-size: 0.95rem;
         }
 
         .form-group {
@@ -230,21 +219,24 @@ export default function ProfilePage() {
           margin-bottom: 0.5rem;
           font-weight: 500;
           color: var(--text-primary);
+          font-size: 0.95rem;
         }
 
         .form-group input {
           width: 100%;
-          padding: 0.75rem;
+          padding: 0.875rem;
           border: 1px solid var(--border);
           border-radius: 6px;
           background: var(--bg);
           color: var(--text-primary);
           font-size: 1rem;
+          transition: border-color 0.2s;
         }
 
         .form-group input:focus {
           outline: none;
           border-color: var(--primary);
+          box-shadow: 0 0 0 3px rgba(2, 255, 151, 0.1);
         }
 
         .form-group input:disabled {
@@ -263,6 +255,7 @@ export default function ProfilePage() {
           padding: 1rem;
           border-radius: 6px;
           margin-bottom: 1.5rem;
+          font-size: 0.95rem;
         }
 
         .alert-error {
@@ -277,10 +270,63 @@ export default function ProfilePage() {
           color: #10b981;
         }
 
+        /* Mobile Responsive */
         @media (max-width: 640px) {
+          .profile-page {
+            padding: 1.5rem 1rem;
+          }
+          
           .profile-header {
             flex-direction: column;
             text-align: center;
+            padding: 1.5rem;
+            gap: 1rem;
+          }
+          
+          .profile-avatar {
+            width: 72px;
+            height: 72px;
+          }
+          
+          .profile-info h1 {
+            font-size: 1.25rem;
+          }
+          
+          .profile-card {
+            padding: 1.5rem;
+          }
+          
+          .profile-card h2 {
+            font-size: 1.15rem;
+          }
+          
+          .card-subtitle {
+            font-size: 0.875rem;
+          }
+          
+          /* Larger touch targets for mobile */
+          .form-group input {
+            min-height: 48px;
+            padding: 1rem;
+            font-size: 16px; /* Prevents zoom on iOS */
+          }
+          
+          .btn {
+            min-height: 48px;
+            padding: 1rem 1.5rem;
+            font-size: 1rem;
+          }
+        }
+        
+        /* Touch-friendly targets */
+        @media (hover: none) and (pointer: coarse) {
+          .form-group input {
+            min-height: 52px;
+            font-size: 16px; /* Prevents zoom on iOS */
+          }
+          
+          .btn {
+            min-height: 52px;
           }
         }
       `}</style>

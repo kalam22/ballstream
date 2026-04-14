@@ -49,7 +49,15 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
+	// Guard against oversized inputs before hitting the database
+	if len(req.Email) > 254 || len(req.Password) > 128 {
+		WriteError(w, http.StatusBadRequest, "INVALID_INPUT", "Input too long")
+		return
+	}
+	if req.Email == "" || req.Password == "" {
+		WriteError(w, http.StatusBadRequest, "INVALID_INPUT", "Email and password are required")
+		return
+	}
 
 	var id int
 	var hash, role string
@@ -72,26 +80,40 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 
 	// Generate a unique Session ID to enforce 1-device policy
 	sessionID := GenerateRequestID()
+	sessionExpiresAt := time.Now().Add(3 * time.Hour)
 	
 	// Check if user already has an active session (another device is logged in)
-	var existingSessionID string
-	checkErr := database.DB.QueryRow("SELECT COALESCE(session_id, '') FROM users WHERE email = $1", req.Email).Scan(&existingSessionID)
-	if checkErr == nil && existingSessionID != "" {
-		// Active session exists — reject the new login
-		WriteError(w, http.StatusConflict, "ALREADY_LOGGED_IN", "Akun ini sudah login di perangkat lain. Silakan logout terlebih dahulu.")
-		return
+	var existingSessionID sql.NullString
+	var existingExpiresAt sql.NullTime
+	checkErr := database.DB.QueryRow(
+		"SELECT session_id, session_expires_at FROM users WHERE email = $1", 
+		req.Email,
+	).Scan(&existingSessionID, &existingExpiresAt)
+	
+	if checkErr == nil && existingSessionID.Valid && existingSessionID.String != "" {
+		// Check if existing session is still valid (not expired)
+		if existingExpiresAt.Valid && existingExpiresAt.Time.After(time.Now()) {
+			// Active session exists and not expired — reject the new login
+			WriteError(w, http.StatusConflict, "ALREADY_LOGGED_IN", "Akun ini sudah login di perangkat lain. Silakan logout terlebih dahulu.")
+			return
+		}
+		// Session expired — allow new login (will replace old session)
+		log.Printf("[Auth] Expired session detected for %s, allowing new login", req.Email)
 	}
 	
 	// Extract device info from User-Agent
-	device := r.UserAgent()
+	device := parseDeviceName(r.UserAgent())
 	if device == "" {
 		device = "Unknown Device"
 	}
 
-	// Store new session and device in database
-	_, err = database.DB.Exec("UPDATE users SET session_id = $1, device = $2 WHERE email = $3", sessionID, device, req.Email)
+	// Store new session, device, and expiry time in database
+	_, err = database.DB.Exec(
+		"UPDATE users SET session_id = $1, device = $2, session_expires_at = $3 WHERE email = $4", 
+		sessionID, device, sessionExpiresAt, req.Email,
+	)
 	if err != nil {
-		log.Printf("[Auth] Failed to update session_id and device: %v", err)
+		log.Printf("[Auth] Failed to update session_id, device, and expiry: %v", err)
 	}
 
 	jwtSecret := os.Getenv("JWT_SECRET")
@@ -200,12 +222,15 @@ func HandleLogout(w http.ResponseWriter, r *http.Request) {
 	if token != nil {
 		if claims, ok := token.Claims.(jwt.MapClaims); ok {
 			if email, _ := claims["sub"].(string); email != "" && database.DB != nil {
-				// Clear session_id and device from DB so next login from any device is allowed
-				_, dbErr := database.DB.Exec("UPDATE users SET session_id = NULL, device = NULL WHERE email = $1", email)
+				// Clear session_id, device, and expiry from DB so next login from any device is allowed
+				_, dbErr := database.DB.Exec(
+					"UPDATE users SET session_id = NULL, device = NULL, session_expires_at = NULL WHERE email = $1", 
+					email,
+				)
 				if dbErr != nil {
-					log.Printf("[Auth] Failed to clear session_id and device on logout for %s: %v", email, dbErr)
+					log.Printf("[Auth] Failed to clear session data on logout for %s: %v", email, dbErr)
 				} else {
-					log.Printf("[Auth] Session and device cleared for %s", email)
+					log.Printf("[Auth] Session data cleared for %s", email)
 				}
 			}
 		}

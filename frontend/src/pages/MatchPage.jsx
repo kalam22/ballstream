@@ -4,6 +4,7 @@ import TeamLogo from '../components/TeamLogo';
 import { Spinner } from '../components/UI';
 import { ErrorAlert } from '../components/Alert';
 import { useCountdown, formatCountdown } from '../hooks/useCountdown';
+import { swal } from '../utils/swal';
 import { 
   Calendar, 
   MapPin, 
@@ -70,9 +71,16 @@ export default function MatchPage({ id }) {
         sessionStorage.setItem(`match_${id}`, JSON.stringify(data));
         setLoading(false);
       })
-      .catch(err => {
+      .catch(async err => {
         setError(err);
         setLoading(false);
+        // Show swal for network/server errors (not 404)
+        if (!err.message?.includes('tidak ditemukan')) {
+          await swal.error({
+            title: 'Gagal Memuat Pertandingan',
+            text: 'Terjadi gangguan saat mengambil data. Silakan coba lagi.',
+          });
+        }
       });
   };
 
@@ -352,7 +360,17 @@ export default function MatchPage({ id }) {
                   {match.sources.map((source, index) => (
                     <button
                       key={index}
-                      onClick={() => { setIframeLoading(true); setSelectedStream(source.embed_url); }}
+                      onClick={async () => {
+                        if (match.status === 'upcoming') {
+                          await swal.info({
+                            title: '⏳ Pertandingan Belum Dimulai',
+                            text: 'Stream akan tersedia saat pertandingan dimulai.',
+                          });
+                          return;
+                        }
+                        setIframeLoading(true);
+                        setSelectedStream(source.embed_url);
+                      }}
                       aria-label={`Stream ${source.stream_no}${source.hd ? ' HD' : ''}${source.language ? ` ${source.language}` : ''}`}
                       style={{
                         padding: '1rem 1.75rem',
@@ -445,7 +463,6 @@ export default function MatchPage({ id }) {
                   {selectedStream && (
                     <iframe
                       src={selectedStream}
-                      allowFullScreen
                       allow="autoplay; fullscreen; picture-in-picture"
                       referrerPolicy="no-referrer"
                       onLoad={() => setIframeLoading(false)}
@@ -456,8 +473,30 @@ export default function MatchPage({ id }) {
               </>
             )}
 
+            {/* No stream notice for finished/upcoming matches */}
+            {(!match.sources || match.sources.length === 0) && match.status !== 'live' && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '1rem',
+                padding: '1.25rem 1.5rem',
+                background: match.status === 'upcoming' ? 'var(--blue-dim)' : 'var(--bg-secondary)',
+                border: `2px solid ${match.status === 'upcoming' ? 'var(--blue)' : 'var(--border)'}`,
+                borderRadius: 'var(--radius)',
+                marginBottom: '2rem',
+                color: match.status === 'upcoming' ? 'var(--blue)' : 'var(--text-muted)',
+                fontWeight: '600',
+                fontSize: '0.9rem',
+              }}>
+                <Video size={20} style={{ flexShrink: 0 }} />
+                {match.status === 'upcoming'
+                  ? 'Stream akan tersedia saat pertandingan dimulai.'
+                  : 'Stream tidak tersedia untuk pertandingan ini.'}
+              </div>
+            )}
+
             {/* Match Info Grid - Sporty Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
               {/* Venue Card */}
               {match.venue_stadium && (
                 <div style={{ 
@@ -539,48 +578,51 @@ export default function MatchPage({ id }) {
                     </div>
                   </div>
                   {(match.referee_games > 0 || match.referee_yellow > 0 || match.referee_red > 0) && (
-                    <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+                    <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem', flexWrap: 'wrap' }}>
                       {match.referee_games > 0 && (
                         <div style={{ 
-                          flex: 1, 
-                          padding: '0.75rem', 
+                          flex: '1 1 60px',
+                          minWidth: 0,
+                          padding: '0.75rem 0.5rem', 
                           background: 'var(--bg-card)', 
                           borderRadius: 'var(--radius-sm)', 
                           textAlign: 'center',
                           border: '1px solid var(--border)'
                         }}>
                           <div style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--text)' }}>{match.referee_games}</div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: '600' }}>Pertandingan</div>
+                          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: '600', whiteSpace: 'nowrap' }}>Pertandingan</div>
                         </div>
                       )}
                       {match.referee_yellow > 0 && (
                         <div style={{ 
-                          flex: 1, 
-                          padding: '0.75rem', 
+                          flex: '1 1 60px',
+                          minWidth: 0,
+                          padding: '0.75rem 0.5rem', 
                           background: 'var(--amber-dim)', 
                           borderRadius: 'var(--radius-sm)', 
                           textAlign: 'center',
                           border: '1px solid var(--amber)'
                         }}>
                           <div style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--amber)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
-                            <div style={{ width: '16px', height: '20px', background: '#fbbf24', borderRadius: '2px' }} /> {match.referee_yellow}
+                            <div style={{ width: '14px', height: '18px', background: '#fbbf24', borderRadius: '2px', flexShrink: 0 }} /> {match.referee_yellow}
                           </div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--amber)', fontWeight: '600' }}>Kuning</div>
+                          <div style={{ fontSize: '0.65rem', color: 'var(--amber)', fontWeight: '600' }}>Kuning</div>
                         </div>
                       )}
                       {match.referee_red > 0 && (
                         <div style={{ 
-                          flex: 1, 
-                          padding: '0.75rem', 
+                          flex: '1 1 60px',
+                          minWidth: 0,
+                          padding: '0.75rem 0.5rem', 
                           background: 'var(--red-dim)', 
                           borderRadius: 'var(--radius-sm)', 
                           textAlign: 'center',
                           border: '1px solid var(--red)'
                         }}>
                           <div style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--red)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
-                            <div style={{ width: '16px', height: '20px', background: '#ef4444', borderRadius: '2px' }} /> {match.referee_red}
+                            <div style={{ width: '14px', height: '18px', background: '#ef4444', borderRadius: '2px', flexShrink: 0 }} /> {match.referee_red}
                           </div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--red)', fontWeight: '600' }}>Merah</div>
+                          <div style={{ fontSize: '0.65rem', color: 'var(--red)', fontWeight: '600' }}>Merah</div>
                         </div>
                       )}
                     </div>
@@ -592,17 +634,20 @@ export default function MatchPage({ id }) {
             {/* Managers Section */}
             {(match.manager_home_name || match.manager_away_name) && (
               <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
-                gap: '1.5rem', 
                 marginBottom: '2rem',
                 padding: '1.5rem',
                 background: 'var(--bg-secondary)',
                 borderRadius: 'var(--radius)',
                 border: '2px solid var(--border)'
               }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  gap: '2rem',
+                  flexWrap: 'wrap'
+                }}>
                 {match.manager_home_name && (
-                  <div style={{ textAlign: 'center' }}>
+                  <div style={{ textAlign: 'center', flex: '1 1 200px', maxWidth: '280px' }}>
                     <div style={{ fontSize: '0.7rem', color: 'var(--accent)', fontWeight: '800', letterSpacing: '1.5px', marginBottom: '1rem', textTransform: 'uppercase', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
                       <Users size={14} /> Pelatih Home
                     </div>
@@ -613,7 +658,9 @@ export default function MatchPage({ id }) {
                         borderRadius: '50%', 
                         marginBottom: '1rem',
                         border: '3px solid var(--accent)',
-                        boxShadow: '0 4px 16px rgba(2,255,151,0.3)'
+                        boxShadow: '0 4px 16px rgba(2,255,151,0.3)',
+                        display: 'block',
+                        margin: '0 auto 1rem'
                       }} onError={e => e.target.style.display='none'} />
                     )}
                     <div style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '0.25rem', color: 'var(--text)' }}>
@@ -627,7 +674,7 @@ export default function MatchPage({ id }) {
                   </div>
                 )}
                 {match.manager_away_name && (
-                  <div style={{ textAlign: 'center' }}>
+                  <div style={{ textAlign: 'center', flex: '1 1 200px', maxWidth: '280px' }}>
                     <div style={{ fontSize: '0.7rem', color: 'var(--blue)', fontWeight: '800', letterSpacing: '1.5px', marginBottom: '1rem', textTransform: 'uppercase', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
                       <Users size={14} /> Pelatih Away
                     </div>
@@ -638,7 +685,9 @@ export default function MatchPage({ id }) {
                         borderRadius: '50%', 
                         marginBottom: '1rem',
                         border: '3px solid var(--blue)',
-                        boxShadow: '0 4px 16px rgba(77,184,255,0.3)'
+                        boxShadow: '0 4px 16px rgba(77,184,255,0.3)',
+                        display: 'block',
+                        margin: '0 auto 1rem'
                       }} onError={e => e.target.style.display='none'} />
                     )}
                     <div style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '0.25rem', color: 'var(--text)' }}>
@@ -651,6 +700,7 @@ export default function MatchPage({ id }) {
                     )}
                   </div>
                 )}
+                </div>
               </div>
             )}
 

@@ -28,10 +28,10 @@ export function AuthProvider({ children }) {
     }
   }, [token]);
 
-  const logout = useCallback(async () => {
-    // Call backend to clear session_id from DB so re-login is possible on any device
-    const currentToken = localStorage.getItem('token');
-    if (currentToken) {
+  const logout = useCallback(async (skipApiCall = false) => {
+    // Use token from state, not localStorage — avoids clearing another user's session
+    const currentToken = token;
+    if (currentToken && !skipApiCall) {
       try {
         await fetch('/api/v1/auth/logout', {
           method: 'POST',
@@ -47,7 +47,7 @@ export function AuthProvider({ children }) {
       clearInterval(sessionPollRef.current);
       sessionPollRef.current = null;
     }
-  }, []);
+  }, [token]);
 
   const login = async (email, password) => {
     try {
@@ -62,12 +62,18 @@ export function AuthProvider({ children }) {
       const data = await response.json();
 
       if (!response.ok) {
-        // Pass back the error code so the UI can handle specific cases (e.g. ALREADY_LOGGED_IN)
         return {
           success: false,
           error: data.error?.message || 'Email atau password salah',
           code: data.error?.code || null,
         };
+      }
+
+      // Clear any previous session state client-side only (no API call)
+      // to avoid accidentally clearing the new user's DB session
+      if (sessionPollRef.current) {
+        clearInterval(sessionPollRef.current);
+        sessionPollRef.current = null;
       }
 
       setToken(data.data.token);
@@ -94,7 +100,7 @@ export function AuthProvider({ children }) {
         }
 
         const timeoutId = setTimeout(() => {
-          logout();
+          logout(true); // skip API call — token already expired, no need to hit /logout
           window.location.href = '/login';
         }, timeRemaining);
 

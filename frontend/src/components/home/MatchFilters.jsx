@@ -17,21 +17,24 @@ const MatchFilters = memo(function MatchFilters({
           className={statusFilter === 'live' ? 'active' : ''}
           aria-label={`Live matches: ${counts.live}`}
         >
-          LIVE <span className="count">{counts.live}</span>
+          <span className="tab-label">LIVE</span>
+          <span className="count">{counts.live}</span>
         </button>
         <button 
           onClick={() => setStatusFilter('upcoming')} 
           className={statusFilter === 'upcoming' ? 'active' : ''}
           aria-label={`Upcoming matches: ${counts.upcoming}`}
         >
-          SCHEDULE <span className="count">{counts.upcoming}</span>
+          <span className="tab-label">JADWAL</span>
+          <span className="count">{counts.upcoming}</span>
         </button>
         <button 
           onClick={() => setStatusFilter('finished')} 
           className={statusFilter === 'finished' ? 'active' : ''}
           aria-label={`Finished matches: ${counts.finished}`}
         >
-          FINISHED <span className="count">{counts.finished}</span>
+          <span className="tab-label">SELESAI</span>
+          <span className="count">{counts.finished}</span>
         </button>
       </div>
 

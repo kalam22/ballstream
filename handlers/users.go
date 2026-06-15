@@ -10,15 +10,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type UserResponse struct {
-	ID        int       `json:"id"`
-	Email     string    `json:"email"`
-	Role      string    `json:"role"`
-	CreatedAt time.Time `json:"created_at"`
+	ID          int        `json:"id"`
+	Email       string     `json:"email"`
+	Role        string     `json:"role"`
+	CreatedAt   time.Time  `json:"created_at"`
+	LastLoginAt *time.Time `json:"last_login_at"`
+	IsOnline    bool       `json:"is_online"`
 }
 
 type CreateUserRequest struct {
@@ -42,13 +43,13 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if user is admin
-	if !isAdmin(r) {
+	if !IsAdmin(r) {
 		WriteError(w, http.StatusForbidden, "FORBIDDEN", "Admin access required")
 		return
 	}
 
 	rows, err := database.DB.Query(`
-		SELECT id, email, role, created_at
+		SELECT id, email, role, created_at, last_login_at, session_id, session_expires_at
 		FROM users
 		ORDER BY created_at DESC
 	`)
@@ -62,15 +63,30 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 	users := []UserResponse{}
 	for rows.Next() {
 		var user UserResponse
+		var lastLogin sql.NullTime
+		var sessionID sql.NullString
+		var sessionExpiresAt sql.NullTime
 		err := rows.Scan(
 			&user.ID,
 			&user.Email,
 			&user.Role,
 			&user.CreatedAt,
+			&lastLogin,
+			&sessionID,
+			&sessionExpiresAt,
 		)
 		if err != nil {
 			log.Printf("[Users] Scan error: %v", err)
 			continue
+		}
+
+		if lastLogin.Valid {
+			user.LastLoginAt = &lastLogin.Time
+		}
+		if sessionID.Valid && sessionID.String != "" && sessionExpiresAt.Valid && sessionExpiresAt.Time.After(time.Now()) {
+			user.IsOnline = true
+		} else {
+			user.IsOnline = false
 		}
 
 		users = append(users, user)
@@ -86,7 +102,7 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !isAdmin(r) {
+	if !IsAdmin(r) {
 		WriteError(w, http.StatusForbidden, "FORBIDDEN", "Admin access required")
 		return
 	}
@@ -103,8 +119,11 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var user UserResponse
+	var lastLogin sql.NullTime
+	var sessionID sql.NullString
+	var sessionExpiresAt sql.NullTime
 	err = database.DB.QueryRow(`
-		SELECT id, email, role, created_at
+		SELECT id, email, role, created_at, last_login_at, session_id, session_expires_at
 		FROM users
 		WHERE id = $1
 	`, id).Scan(
@@ -112,7 +131,21 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 		&user.Email,
 		&user.Role,
 		&user.CreatedAt,
+		&lastLogin,
+		&sessionID,
+		&sessionExpiresAt,
 	)
+
+	if err == nil {
+		if lastLogin.Valid {
+			user.LastLoginAt = &lastLogin.Time
+		}
+		if sessionID.Valid && sessionID.String != "" && sessionExpiresAt.Valid && sessionExpiresAt.Time.After(time.Now()) {
+			user.IsOnline = true
+		} else {
+			user.IsOnline = false
+		}
+	}
 
 	if err == sql.ErrNoRows {
 		WriteError(w, http.StatusNotFound, "USER_NOT_FOUND", "User not found")
@@ -134,7 +167,7 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !isAdmin(r) {
+	if !IsAdmin(r) {
 		WriteError(w, http.StatusForbidden, "FORBIDDEN", "Admin access required")
 		return
 	}
@@ -205,7 +238,7 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !isAdmin(r) {
+	if !IsAdmin(r) {
 		WriteError(w, http.StatusForbidden, "FORBIDDEN", "Admin access required")
 		return
 	}
@@ -316,7 +349,7 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !isAdmin(r) {
+	if !IsAdmin(r) {
 		WriteError(w, http.StatusForbidden, "FORBIDDEN", "Admin access required")
 		return
 	}
@@ -333,7 +366,7 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Prevent deleting yourself
-	userEmail := getUserEmailFromToken(r)
+	userEmail := GetUserEmail(r)
 	var targetEmail string
 	database.DB.QueryRow("SELECT email FROM users WHERE id = $1", id).Scan(&targetEmail)
 	if targetEmail == userEmail {
@@ -359,77 +392,94 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// Helper functions
-func isAdmin(r *http.Request) bool {
-	authHeader := r.Header.Get("Authorization")
-	if !strings.HasPrefix(authHeader, "Bearer ") {
-		return false
+// ResetPassword resets a user's password to "Kana123!" (admin only)
+func ResetPassword(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		WriteError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method must be POST")
+		return
 	}
 
-	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		return []byte(database.GetJWTSecret()), nil
+	if !IsAdmin(r) {
+		WriteError(w, http.StatusForbidden, "FORBIDDEN", "Admin access required")
+		return
+	}
+
+	// Extract ID from path
+	path := r.URL.Path
+	idStr := strings.TrimPrefix(path, "/api/v1/users/")
+	idStr = strings.TrimSuffix(idStr, "/reset-password")
+	idStr = strings.TrimSuffix(idStr, "/")
+
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "INVALID_ID", "Invalid user ID")
+		return
+	}
+
+	defaultPassword := "Kana123!"
+	hash, err := bcrypt.GenerateFromPassword([]byte(defaultPassword), bcrypt.DefaultCost)
+	if err != nil {
+		WriteError(w, http.StatusInternalServerError, "HASH_ERROR", "Failed to hash password")
+		return
+	}
+
+	result, err := database.DB.Exec("UPDATE users SET password_hash = $1 WHERE id = $2", string(hash), id)
+	if err != nil {
+		log.Printf("[Users] Reset password error: %v", err)
+		WriteError(w, http.StatusInternalServerError, "DB_ERROR", "Failed to reset password")
+		return
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		WriteError(w, http.StatusNotFound, "USER_NOT_FOUND", "User not found")
+		return
+	}
+
+	WriteSuccess(w, map[string]string{
+		"message": "Password reset to default successfully",
 	})
-
-	if err != nil || !token.Valid {
-		return false
-	}
-
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return false
-	}
-
-	email, _ := claims["sub"].(string)
-	sessionID, _ := claims["session_id"].(string)
-
-	if email == "" || sessionID == "" || database.DB == nil {
-		return false
-	}
-
-	var dbSessionID string
-	err = database.DB.QueryRow("SELECT session_id FROM users WHERE email = $1", email).Scan(&dbSessionID)
-	if err != nil || dbSessionID != sessionID {
-		return false
-	}
-
-	role, ok := claims["role"].(string)
-	// Hanya super_admin yang bisa akses
-	return ok && role == "super_admin"
 }
 
-func getUserEmailFromToken(r *http.Request) string {
-	authHeader := r.Header.Get("Authorization")
-	if !strings.HasPrefix(authHeader, "Bearer ") {
-		return ""
+// ResetSession clears a user's session_id, forcing logout (admin only)
+func ResetSession(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		WriteError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method must be POST")
+		return
 	}
 
-	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		return []byte(database.GetJWTSecret()), nil
+	if !IsAdmin(r) {
+		WriteError(w, http.StatusForbidden, "FORBIDDEN", "Admin access required")
+		return
+	}
+
+	// Extract ID from path
+	path := r.URL.Path
+	idStr := strings.TrimPrefix(path, "/api/v1/users/")
+	idStr = strings.TrimSuffix(idStr, "/reset-session")
+	idStr = strings.TrimSuffix(idStr, "/")
+
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "INVALID_ID", "Invalid user ID")
+		return
+	}
+
+	result, err := database.DB.Exec("UPDATE users SET session_id = NULL, device = NULL, session_expires_at = NULL WHERE id = $1", id)
+	if err != nil {
+		log.Printf("[Users] Reset session error: %v", err)
+		WriteError(w, http.StatusInternalServerError, "DB_ERROR", "Failed to reset session")
+		return
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		WriteError(w, http.StatusNotFound, "USER_NOT_FOUND", "User not found")
+		return
+	}
+
+	WriteSuccess(w, map[string]string{
+		"message": "Session reset successfully",
 	})
-
-	if err != nil || !token.Valid {
-		return ""
-	}
-
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return ""
-	}
-
-	email, _ := claims["sub"].(string)
-	sessionID, _ := claims["session_id"].(string)
-
-	if email == "" || sessionID == "" || database.DB == nil {
-		return ""
-	}
-
-	var dbSessionID string
-	err = database.DB.QueryRow("SELECT session_id FROM users WHERE email = $1", email).Scan(&dbSessionID)
-	if err != nil || dbSessionID != sessionID {
-		return ""
-	}
-
-	return email
 }
+

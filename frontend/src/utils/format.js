@@ -25,7 +25,9 @@ export function formatDate(date) {
         year: 'numeric',
       });
     }
-  } catch (e) {}
+  } catch {
+    // Invalid date — return raw string
+  }
   return String(date);
 }
 

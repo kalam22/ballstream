@@ -37,7 +37,7 @@ export function AuthProvider({ children }) {
           method: 'POST',
           headers: { Authorization: `Bearer ${currentToken}` },
         });
-      } catch (_) {
+      } catch {
         // Ignore network errors — still do client-side logout
       }
     }
@@ -95,6 +95,7 @@ export function AuthProvider({ children }) {
         const timeRemaining = Math.max(0, expirationTime - Date.now());
 
         if (timeRemaining === 0) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
           logout();
           return;
         }
@@ -143,7 +144,7 @@ export function AuthProvider({ children }) {
             window.location.href = '/login';
           }
         }
-      } catch (_) {
+      } catch {
         // Network error — do not force logout, user might just be offline
       }
     };
@@ -169,6 +170,7 @@ export function AuthProvider({ children }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {

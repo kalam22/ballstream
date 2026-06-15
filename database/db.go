@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"log"
 	"os"
+	"time"
 
 	_ "github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
@@ -41,6 +42,11 @@ func InitDB() {
 		log.Fatalf("[DB] Failed to connect to db: %v", err)
 	}
 	
+	// Connection pool configuration
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(10)
+	db.SetConnMaxLifetime(5 * time.Minute)
+	
 	DB = db
 	log.Println("[DB] Connected to PostgreSQL successfully.")
 
@@ -60,6 +66,7 @@ func createTables() {
 	ALTER TABLE users ADD COLUMN IF NOT EXISTS session_id VARCHAR(255);
 	ALTER TABLE users ADD COLUMN IF NOT EXISTS device VARCHAR(255);
 	ALTER TABLE users ADD COLUMN IF NOT EXISTS session_expires_at TIMESTAMP WITH TIME ZONE;
+	ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP WITH TIME ZONE;
 	`
 	if _, err := DB.Exec(query); err != nil {
 		log.Fatalf("[DB] Failed to create users table: %v", err)

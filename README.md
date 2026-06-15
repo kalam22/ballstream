@@ -1,318 +1,185 @@
-# Football Stream
+# ⚽ BallStream
 
-Live football match streaming platform with Go backend and React frontend.
-
-## 🎉 Latest Update: API v1 Released!
-
-**API Score:** 92/100 ⭐ (upgraded from 78/100)
-
-New features:
-- ✅ API Versioning (`/api/v1/*`)
-- ✅ Pagination support
-- ✅ Standardized error responses
-- ✅ Health check endpoint
-- ✅ OpenAPI documentation
-- ✅ Request ID tracking
-
-📖 [Quick Start Guide](QUICK_START_API_V1.md) | [Full Implementation Report](API_OPTIMIZATION_IMPLEMENTED.md)
-
----
+Live football match center — real-time scores, schedules, and results from global leagues. Built with **Go** backend + **React 19** frontend.
 
 ## 🚀 Quick Start
 
-### 1. Start Backend (Terminal 1)
 ```bash
+# Terminal 1 — Backend (http://localhost:8081)
 go run main.go
-```
-Backend runs on: **http://localhost:8081**
 
-### 2. Start Frontend (Terminal 2)
-```bash
-cd frontend
-npm run dev
-```
-Frontend runs on: **http://localhost:5173**
-
-### 3. Open Browser
-```
-http://localhost:5173
+# Terminal 2 — Frontend (http://localhost:5173)
+cd frontend && npm run dev
 ```
 
-## 📖 Documentation
+Open **http://localhost:5173**
 
-- [🚀 Quick Start API v1](QUICK_START_API_V1.md) - New API features and usage
-- [📊 API Optimization Report](API_OPTIMIZATION_IMPLEMENTED.md) - Implementation details
-- [📘 Complete Setup Guide](CARA_MENJALANKAN.md) - Detailed installation and configuration
-- [🔒 Security Guide](SECURITY.md) - Security features and best practices
-- [🚀 Deployment Guide](DEPLOYMENT.md) - Production deployment instructions
-- [📄 OpenAPI Spec](openapi.yaml) - Complete API documentation
+---
 
 ## 🏗️ Architecture
 
 ```
 Browser (localhost:5173)
-    ↓ API requests
+    ↓ /api/* proxied by Vite
 Backend (localhost:8081)
+    ↓
+PostgreSQL ─── Upstream API (sportsrc.org)
 ```
 
-- **Backend:** Go 1.21+ - Pure API server
-- **Frontend:** React 18 + Vite - Separate dev server
-- **Communication:** Vite proxies `/api/*` to backend
+| Layer | Tech | Notes |
+|-------|------|-------|
+| Backend | Go 1.21+ stdlib | REST API, JWT auth, circuit breaker |
+| Frontend | React 19 + Vite 8 | SPA, client-side routing, TailwindCSS |
+| DB | PostgreSQL | Sessions, cache, user data |
+| Cache | In-memory (Go) | Auto-refresh from upstream API |
+
+---
 
 ## ✨ Features
 
-- ⚽ Live match streaming
-- 📊 Real-time match data with auto-refresh
-- 🎨 Modern responsive UI
-- 🔒 Security headers and CORS
-- 🚀 Hot reload for development
-- 🔐 Optional API authentication
-- 📈 Rate limiting and DDoS protection
+- **Live matches** — real-time scores with auto-refresh countdown
+- **Upcoming & finished** — full schedule and results
+- **Auth system** — JWT login/logout, session polling (30s), auto-logout on concurrent login
+- **User management** (super_admin) — CRUD, password reset, session reset
+- **Role-based access** — `user` / `super_admin` roles
+- **Dark/light theme** — persisted to localStorage
+- **CSRF protection** — single-use tokens on mutating requests
+- **Responsive design** — mobile-first, glassmorphism UI
+
+---
 
 ## 🛠️ Tech Stack
 
 ### Backend
-- Go 1.21+
-- Standard library HTTP server
-- Environment-based configuration
-- Circuit breaker for upstream APIs
+- Go standard library HTTP server
+- JWT (golang-jwt) — access + refresh token flow
+- PostgreSQL (lib/pq) — users, sessions
+- In-memory cache with TTL + circuit breaker
+- Gzip compression, rate limiting, security headers
+- Request ID logging middleware
 
 ### Frontend
-- React 18
-- Vite 8
-- React Router (client-side)
-- Modern CSS with custom properties
+- React 19 with hooks + context
+- Vite 8 (dev server + build)
+- TailwindCSS v4
+- SweetAlert2 — themed toast/dialogs
+- lucide-react — icon set
+- Custom SVG icons (inline)
 
-## 📦 Installation
+---
 
-### Prerequisites
-- Go 1.21+
-- Node.js 18+
-- API keys from https://api.sportsrc.org/
+## 👤 Auth System
 
-### Backend Setup
-```bash
-# Install dependencies
-go mod download
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/auth/login` | POST | Login with email/password |
+| `/api/v1/auth/logout` | POST | Invalidate session |
+| `/api/v1/auth/verify` | GET | Session health check (polled every 30s) |
+| `/api/v1/auth/csrf` | GET | Get single-use CSRF token |
 
-# Copy environment file
-cp .env.example .env
+- Passwords: bcrypt, min 8 chars, must have upper+lower+digit+special
+- Sessions tracked in DB — concurrent login from another device invalidates this session
+- Token expiry read from JWT payload → auto-logout on expiry
 
-# Edit .env and add your API keys
-# NEVER commit .env to Git!
-```
+---
 
-### Frontend Setup
-```bash
-cd frontend
+## 👥 User Management (Super Admin)
 
-# Install dependencies
-npm install
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/users` | GET | List all users |
+| `/api/v1/users` | POST | Create user |
+| `/api/v1/users/:id` | PUT | Update user |
+| `/api/v1/users/:id` | DELETE | Delete user |
+| `/api/v1/users/:id/reset-password` | POST | Reset to default |
+| `/api/v1/users/:id/reset-session` | POST | Force logout all devices |
 
-# Copy environment file
-cp .env.example .env
-
-# Edit .env if needed (optional in dev mode)
-```
-
-## ⚙️ Configuration
-
-### Backend (`.env`)
-```bash
-PORT=8081
-ENV=development  # or 'production'
-API_KEY=your-api-key-here
-ALLOWED_ORIGINS=http://localhost:5173
-API_AUTH_REQUIRED=false  # Development mode
-CLIENT_API_KEYS=  # Optional API keys for frontend auth
-```
-
-### Frontend (`frontend/.env`)
-```bash
-VITE_API_KEY=  # Empty for development mode
-```
-
-## 🔌 API Endpoints
-
-### New Versioned Endpoints (v1)
-All endpoints available at `http://localhost:8081`:
-
-- `GET /health` - Health check with cache status
-- `GET /api/v1/matches` - List all matches (paginated)
-- `GET /api/v1/match/:id` - Match detail
-- `GET /api/v1/bootstrap` - Initial data
-- `GET /api/v1/account` - Account info
-- `GET /api/v1/sports` - Sports list
-- `GET /api/v1/upstreams` - Upstream status
-- `GET /internal/metrics` - Prometheus metrics (localhost only)
-
-### Legacy Endpoints (Backward Compatible)
-- `GET /api/matches` - Alias to `/api/v1/matches`
-- `GET /api/match/:id` - Alias to `/api/v1/match/:id`
-- `GET /api/bootstrap` - Alias to `/api/v1/bootstrap`
-- `GET /api/account` - Alias to `/api/v1/account`
-- `GET /api/sports` - Alias to `/api/v1/sports`
-- `GET /api/upstreams` - Alias to `/api/v1/upstreams`
-
-### Pagination
-```bash
-# Default (page 1, 50 items)
-GET /api/v1/matches
-
-# Custom pagination
-GET /api/v1/matches?page=2&limit=20
-```
-
-### Response Format
-```json
-{
-  "success": true,
-  "data": [...],
-  "meta": {
-    "page": 1,
-    "limit": 50,
-    "total": 78,
-    "total_pages": 2
-  }
-}
-```
-
-## 🔧 Development
-
-### Auto-Reload Backend (Optional)
-```bash
-# Install air
-go install github.com/cosmtrek/air@latest
-
-# Run with auto-reload
-air
-```
-
-### Frontend Hot Reload
-Automatic - just save your files!
-
-### Vite Proxy Configuration
-Frontend automatically proxies API requests to backend:
-```javascript
-// vite.config.js
-server: {
-  proxy: {
-    '/api': 'http://localhost:8081'
-  }
-}
-```
-
-## 🏭 Production Build
-
-### Build Frontend
-```bash
-cd frontend
-npm run build
-```
-
-### Build Backend
-```bash
-go build -o football-stream.exe main.go
-```
-
-### Deploy
-1. Upload binary and `frontend/dist/`
-2. Set environment variables
-3. Run: `./football-stream.exe`
-
-## 🔒 Security Features
-
-- ✅ API key authentication (optional)
-- ✅ Rate limiting per IP
-- ✅ CORS with origin allowlist
-- ✅ Input validation
-- ✅ Security headers (CSP, HSTS, etc.)
-- ✅ Request body size limits
-- ✅ Circuit breaker for upstream APIs
-- ✅ HTTPS support
-- ✅ Pre-commit hooks to prevent secret leaks
-
-## 🐛 Troubleshooting
-
-### Backend won't start
-```bash
-# Check if port 8081 is in use
-netstat -ano | findstr :8081
-```
-
-### Frontend won't start
-```bash
-# Check if port 5173 is in use
-netstat -ano | findstr :5173
-# Vite will auto-use next available port
-```
-
-### CORS errors
-Ensure `ALLOWED_ORIGINS` in `.env` includes `http://localhost:5173`
-
-### API 403 Forbidden
-Replace API keys in `.env` with valid keys from https://api.sportsrc.org/
-
-### Data not loading
-1. Check backend is running: `curl http://localhost:8081`
-2. Check API keys are valid
-3. Check browser console for errors
-4. Check Network tab in DevTools
+---
 
 ## 📁 Project Structure
 
 ```
 .
-├── main.go                 # Backend entry point
-├── handlers/              # API handlers
-│   ├── api.go            # API endpoints
-│   ├── cache.go          # Caching layer
-│   ├── fetch.go          # Upstream client
-│   └── observability.go  # Metrics
-├── models/               # Data models
-├── .env                  # Backend config (not in Git)
+├── main.go                 # Entry point
+├── internal/
+│   ├── handlers/          # HTTP handlers
+│   ├── middleware/        # Auth, CORS, rate limit, logging, gzip, security
+│   ├── models/           # Data models
+│   ├── config/           # Env-based config
+│   └── services/         # Business logic
 ├── frontend/
-│   ├── src/             # React source code
-│   │   ├── components/  # UI components
-│   │   ├── hooks/       # Custom hooks
-│   │   ├── pages/       # Page components
-│   │   └── context/     # React context
-│   ├── dist/            # Production build
-│   ├── .env             # Frontend config (not in Git)
-│   ├── vite.config.js   # Vite config (proxy)
+│   ├── src/
+│   │   ├── components/   # UI components (Navbar, Icons, UI, etc.)
+│   │   ├── context/      # React providers (Auth, Data, Theme)
+│   │   ├── hooks/        # Custom hooks (useApi, useCountdown)
+│   │   ├── pages/        # Page components
+│   │   ├── routes/       # Client-side routing
+│   │   ├── services/     # API client layer
+│   │   └── utils/        # Helpers (format, security, swal)
+│   ├── vite.config.js    # Vite config + proxy
 │   └── package.json
+├── .env                   # Backend config (not in Git)
 └── README.md
 ```
 
-## 🌐 Port Summary
+---
 
-| Service | Port | URL | Purpose |
-|---------|------|-----|---------|
-| Backend | 8081 | http://localhost:8081 | API Server (Go) |
-| Frontend | 5173 | http://localhost:5173 | Dev Server (Vite) |
+## ⚙️ Configuration
+
+### Backend (`.env`)
+```env
+PORT=8081
+ENV=development
+DATABASE_URL=postgres://user:pass@localhost:5432/ballstream
+JWT_SECRET=your-secret-key
+ALLOWED_ORIGINS=http://localhost:5173,https://ball-stream.kana.my.id
+```
+
+### Frontend (`frontend/.env`)
+```env
+VITE_API_KEY=  # Empty for dev, set for production
+```
+
+---
+
+## 🔒 Security
+
+- JWT access token with expiry
+- bcrypt password hashing
+- CSRF tokens (single-use, per-request)
+- Session tracking — detect concurrent logins
+- Rate limiting per IP
+- CORS origin allowlist
+- Security headers (CSP, HSTS, X-Frame-Options, etc.)
+- Request body size limits
+- Gzip compression
+
+---
+
+## 🌐 Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /health` | Health check |
+| `GET /api/v1/bootstrap` | Initial data (sports, account, refresh config) |
+| `GET /api/v1/account` | Account usage info |
+| `GET /api/v1/matches` | All matches |
+| `GET /api/v1/match/:id` | Match detail |
+| `GET /api/v1/sports` | Sports list |
+| `GET /api/v1/upstreams` | Upstream status |
+| `GET /api/v1/users` | User list (super_admin) |
+
+---
+
+## 🖥️ Port Summary
+
+| Service | Port | URL |
+|---------|------|-----|
+| Backend | 8081 | http://localhost:8081 |
+| Frontend | 5173 | http://localhost:5173 |
+
+---
 
 ## 📝 License
 
 MIT
-
-## 🆕 What's New in v1
-
-- **API Versioning:** `/api/v1/*` endpoints with backward compatibility
-- **Pagination:** All list endpoints support `?page=1&limit=50`
-- **Standardized Errors:** Consistent JSON format with error codes
-- **Health Check:** `/health` endpoint for monitoring
-- **Request ID Tracking:** `X-Request-ID` header for debugging
-- **OpenAPI Docs:** Complete API specification in `openapi.yaml`
-- **Production Security:** Automatic authentication enforcement
-
-See [API_OPTIMIZATION_IMPLEMENTED.md](API_OPTIMIZATION_IMPLEMENTED.md) for details.
-
-## 🤝 Support
-
-- 🚀 [Quick Start API v1](QUICK_START_API_V1.md)
-- 📊 [API Optimization Report](API_OPTIMIZATION_IMPLEMENTED.md)
-- 📖 [Setup Guide](CARA_MENJALANKAN.md)
-- 🔒 [Security Guide](SECURITY.md)
-- 🚀 [Deployment Guide](DEPLOYMENT.md)
-- 📄 [OpenAPI Spec](openapi.yaml)
-- 🐛 Issues: Open a GitHub issue

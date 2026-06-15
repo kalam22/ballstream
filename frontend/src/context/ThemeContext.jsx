@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 
 const ThemeCtx = createContext({ theme: 'dark', toggle: () => {} })
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useTheme() {
   return useContext(ThemeCtx)
 }
@@ -11,13 +12,15 @@ export function ThemeProvider({ children }) {
     try {
       const saved = localStorage.getItem('ks-theme')
       if (saved === 'dark' || saved === 'light') return saved
-    } catch {}
+    } catch {
+      // localStorage unavailable — fall back to system preference
+    }
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   })
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
-    try { localStorage.setItem('ks-theme', theme) } catch {}
+    try { localStorage.setItem('ks-theme', theme) } catch { /* ignore quota errors */ }
   }, [theme])
 
   const toggle = useCallback(() =>

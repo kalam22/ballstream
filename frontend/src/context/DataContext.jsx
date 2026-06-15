@@ -7,6 +7,7 @@ const DataCtx = createContext({
   refreshCfg: { matchesSeconds: 600, accountSeconds: 300, sportsSeconds: 3600 },
 })
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useData() {
   return useContext(DataCtx)
 }

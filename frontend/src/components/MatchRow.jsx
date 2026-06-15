@@ -3,7 +3,6 @@ import { STATUS_MAP } from '../utils/format.js'
 import TeamLogo from './TeamLogo.jsx'
 
 const MatchRow = memo(function MatchRow({ match, idx = 0 }) {
-  const isUpcoming = match.status === 'upcoming'
   const state = STATUS_MAP[match.status] ?? { label: match.status || '?', cls: '' }
   const hasScore = match.home_score != null
 

@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { Icon } from '../components/Icons';
 import Navbar from '../components/Navbar';
 import { validatePassword, isValidEmail } from '../utils/security';
-import { getCSRFToken } from '../hooks/useApi';
+import { getCSRFToken, invalidateCSRFToken } from '../hooks/useApi';
 import { swal } from '../utils/swal';
 
 export default function UsersPage() {
@@ -20,25 +20,11 @@ export default function UsersPage() {
     role: 'user',
   });
   const [passwordError, setPasswordError] = useState('');
-
-  // Check if current user is super admin
-  if (user?.role !== 'super_admin') {
-    return (
-      <>
-        <Navbar activePage="users" />
-        <div className="page-container">
-          <div className="error-state">
-            <Icon name="alert-circle" size={48} />
-            <h2>Akses Ditolak</h2>
-            <p>Anda tidak memiliki izin untuk mengakses halaman ini. Hanya Super Admin yang dapat mengakses User Management.</p>
-          </div>
-        </div>
-      </>
-    );
-  }
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     fetchUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchUsers = async () => {
@@ -79,6 +65,7 @@ export default function UsersPage() {
       password: '',
       role: 'user',
     });
+    setShowPassword(false);
     setShowModal(true);
   };
 
@@ -90,6 +77,7 @@ export default function UsersPage() {
       password: '',
       role: user.role,
     });
+    setShowPassword(false);
     setShowModal(true);
   };
 
@@ -150,6 +138,8 @@ export default function UsersPage() {
       await swal.success({ title: modalMode === 'create' ? 'User berhasil ditambahkan' : 'User berhasil diperbarui' });
     } catch (err) {
       await swal.error({ title: 'Gagal menyimpan', text: err.message });
+    } finally {
+      invalidateCSRFToken();
     }
   };
 
@@ -183,19 +173,82 @@ export default function UsersPage() {
       await swal.success({ title: 'User berhasil dihapus' });
     } catch (err) {
       await swal.error({ title: 'Gagal menghapus', text: err.message });
+    } finally {
+      invalidateCSRFToken();
     }
   };
 
-  const handlePermissionChange = (permission) => {
-    setFormData({
-      ...formData,
-      permissions: {
-        ...formData.permissions,
-        [permission]: !formData.permissions[permission],
-      },
-    });
+  const handleResetPassword = async (userId) => {
+    const confirmed = await swal.confirm({
+      title: 'Reset Password?',
+      text: 'Password akan direset menjadi "Kana123!".',
+      confirmText: 'Reset',
+      cancelText: 'Batal',
+    })
+    if (!confirmed) return;
+
+    try {
+      const csrfToken = await getCSRFToken();
+
+      const response = await fetch(`/api/v1/users/${userId}/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {})
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error?.message || 'Gagal mereset password');
+      }
+
+      await swal.success({ title: 'Password berhasil direset ke "Kana123!"' });
+    } catch (err) {
+      await swal.error({ title: 'Gagal mereset password', text: err.message });
+    } finally {
+      invalidateCSRFToken();
+    }
   };
 
+  const handleResetSession = async (userId) => {
+    const confirmed = await swal.confirm({
+      title: 'Reset Session?',
+      text: 'User akan dipaksa keluar (force logout) dari semua perangkat.',
+      confirmText: 'Reset',
+      cancelText: 'Batal',
+    })
+    if (!confirmed) return;
+
+    try {
+      const csrfToken = await getCSRFToken();
+
+      const response = await fetch(`/api/v1/users/${userId}/reset-session`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {})
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error?.message || 'Gagal mereset session');
+      }
+
+      await swal.success({ title: 'Session berhasil direset' });
+    } catch (err) {
+      await swal.error({ title: 'Gagal mereset session', text: err.message });
+    } finally {
+      invalidateCSRFToken();
+    }
+  };
+
+
+
+  // Loading state check (after all hooks)
   if (loading) {
     return (
       <>
@@ -204,6 +257,22 @@ export default function UsersPage() {
           <div className="loading-state">
             <div className="spinner"></div>
             <p>Memuat data user...</p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // Check if current user is super admin (after hooks)
+  if (user?.role !== 'super_admin') {
+    return (
+      <>
+        <Navbar activePage="users" />
+        <div className="page-container">
+          <div className="error-state">
+            <Icon name="alert-circle" size={48} />
+            <h2>Akses Ditolak</h2>
+            <p>Anda tidak memiliki izin untuk mengakses halaman ini. Hanya Super Admin yang dapat mengakses User Management.</p>
           </div>
         </div>
       </>
@@ -238,16 +307,18 @@ export default function UsersPage() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th style={{ width: '40%' }}>EMAIL</th>
-                  <th style={{ width: '20%' }}>ROLE</th>
-                  <th style={{ width: '25%' }}>DIBUAT</th>
-                  <th style={{ width: '15%', textAlign: 'center' }}>AKSI</th>
+                  <th style={{ width: '30%' }}>EMAIL</th>
+                  <th style={{ width: '15%' }}>ROLE</th>
+                  <th style={{ width: '15%' }}>DIBUAT</th>
+                  <th style={{ width: '15%' }}>STATUS</th>
+                  <th style={{ width: '15%' }}>LAST LOGIN</th>
+                  <th style={{ width: '10%', textAlign: 'center' }}>AKSI</th>
                 </tr>
               </thead>
               <tbody>
                 {users.length === 0 ? (
                   <tr>
-                    <td colSpan="4" style={{ textAlign: 'center', padding: '3rem' }}>
+                    <td colSpan="6" style={{ textAlign: 'center', padding: '3rem' }}>
                       <div className="empty-state">
                         <Icon name="users" size={48} />
                         <p>Belum ada user</p>
@@ -278,6 +349,23 @@ export default function UsersPage() {
                         </span>
                       </td>
                       <td>
+                        <span className={`status-badge ${user.is_online ? 'online' : 'offline'}`}>
+                          <span className="status-dot" />
+                          {user.is_online ? 'Online' : 'Offline'}
+                        </span>
+                      </td>
+                      <td>
+                        <span className="date-text">
+                          {user.last_login_at ? new Date(user.last_login_at).toLocaleString('id-ID', {
+                            day: 'numeric',
+                            month: 'numeric',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          }) : '-'}
+                        </span>
+                      </td>
+                      <td>
                         <div className="action-buttons">
                           <button
                             className="btn-icon btn-edit"
@@ -285,6 +373,20 @@ export default function UsersPage() {
                             title="Edit User"
                           >
                             <Icon name="edit" size={16} />
+                          </button>
+                          <button
+                            className="btn-icon btn-reset-password"
+                            onClick={() => handleResetPassword(user.id)}
+                            title="Reset Password ke Default"
+                          >
+                            <Icon name="key" size={16} />
+                          </button>
+                          <button
+                            className="btn-icon btn-reset-session"
+                            onClick={() => handleResetSession(user.id)}
+                            title="Reset Session / Force Logout"
+                          >
+                            <Icon name="shield" size={16} />
                           </button>
                           <button
                             className="btn-icon btn-delete"
@@ -337,13 +439,36 @@ export default function UsersPage() {
 
                 <div className="form-group">
                   <label>Password {modalMode === 'edit' && '(kosongkan jika tidak diubah)'}</label>
-                  <input
-                    type="password"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    required={modalMode === 'create'}
-                    placeholder="Masukkan Password Baru"
-                  />
+                  <div style={{ position: 'relative', width: '100%' }}>
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      required={modalMode === 'create'}
+                      placeholder="Masukkan Password Baru"
+                      style={{ paddingRight: '2.5rem', width: '100%' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      style={{
+                        position: 'absolute',
+                        right: '0.75rem',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        color: 'var(--color-text-muted, #718096)'
+                      }}
+                      title={showPassword ? "Sembunyikan Password" : "Tampilkan Password"}
+                    >
+                      <Icon name={showPassword ? "eye-off" : "eye"} size={18} />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="form-group">

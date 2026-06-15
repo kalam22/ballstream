@@ -5,9 +5,34 @@ import Navbar from '../components/Navbar';
 import { validatePassword } from '../utils/security';
 import { swal } from '../utils/swal';
 
+function EyeOn() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+  );
+}
+
+function EyeOff() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+      <path d="m6.72 6.72-4.24-4.24"/>
+      <line x1="1" y1="1" x2="23" y2="23"/>
+    </svg>
+  );
+}
+
 export default function ProfilePage() {
   const { token, user, logout } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [formData, setFormData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -16,10 +41,7 @@ export default function ProfilePage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(null);
-    setSuccess(false);
 
-    // Validasi password strength
     const passwordValidation = validatePassword(formData.newPassword);
     if (!passwordValidation.valid) {
       await swal.error({ title: 'Password Tidak Valid', text: passwordValidation.message });
@@ -34,7 +56,6 @@ export default function ProfilePage() {
     try {
       setLoading(true);
 
-      // Get current user ID
       const usersResponse = await fetch('/api/v1/users', {
         headers: { 'Authorization': `Bearer ${token}` },
       });
@@ -45,7 +66,6 @@ export default function ProfilePage() {
       const currentUser = usersData.data.find(u => u.email === user.email);
       if (!currentUser) throw new Error('User tidak ditemukan');
 
-      // Update password — kirim currentPassword untuk verifikasi
       const response = await fetch(`/api/v1/users/${currentUser.id}`, {
         method: 'PUT',
         headers: {
@@ -103,43 +123,74 @@ export default function ProfilePage() {
             <form onSubmit={handleSubmit}>
               <div className="form-group">
                 <label>Password Saat Ini</label>
-                <input
-                  type="password"
-                  value={formData.currentPassword}
-                  onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
-                  required
-                  placeholder="Masukkan password saat ini"
-                  disabled={loading}
-                />
+                <div className="input-wrapper">
+                  <input
+                    type={showCurrent ? 'text' : 'password'}
+                    value={formData.currentPassword}
+                    onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
+                    required
+                    placeholder="Masukkan password saat ini"
+                    disabled={loading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCurrent(!showCurrent)}
+                    className="password-toggle"
+                    aria-label={showCurrent ? 'Sembunyikan password' : 'Tampilkan password'}
+                    tabIndex={-1}
+                  >
+                    {showCurrent ? <EyeOff /> : <EyeOn />}
+                  </button>
+                </div>
               </div>
 
               <div className="form-group">
                 <label>Password Baru</label>
-                <input
-                  type="password"
-                  value={formData.newPassword}
-                  onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
-                  required
-                  placeholder="Masukkan Password Baru"
-                  minLength={8}
-                  disabled={loading}
-                />
-                <small style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '0.25rem', display: 'block' }}>
-                  Masukkan Password Baru
-                </small>
+                <div className="input-wrapper">
+                  <input
+                    type={showNew ? 'text' : 'password'}
+                    value={formData.newPassword}
+                    onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
+                    required
+                    placeholder="Masukkan Password Baru"
+                    minLength={8}
+                    disabled={loading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNew(!showNew)}
+                    className="password-toggle"
+                    aria-label={showNew ? 'Sembunyikan password' : 'Tampilkan password'}
+                    tabIndex={-1}
+                  >
+                    {showNew ? <EyeOff /> : <EyeOn />}
+                  </button>
+                </div>
+                <small className="password-hint">Minimal 8 karakter, kombinasi huruf besar, angka, dan simbol.</small>
               </div>
 
               <div className="form-group">
                 <label>Konfirmasi Password Baru</label>
-                <input
-                  type="password"
-                  value={formData.confirmPassword}
-                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                  required
-                  placeholder="Ketik ulang password baru"
-                  minLength={8}
-                  disabled={loading}
-                />
+                <div className="input-wrapper">
+                  <input
+                    type={showConfirm ? 'text' : 'password'}
+                    value={formData.confirmPassword}
+                    onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                    required
+                    placeholder="Ketik ulang password baru"
+                    minLength={8}
+                    disabled={loading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirm(!showConfirm)}
+                    className="password-toggle"
+                    aria-label={showConfirm ? 'Sembunyikan password' : 'Tampilkan password'}
+                    tabIndex={-1}
+                  >
+                    {showConfirm ? <EyeOff /> : <EyeOn />}
+                  </button>
+                </div>
               </div>
 
               <div className="form-actions">
@@ -155,181 +206,6 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
-
-      <style>{`
-        .profile-page {
-          max-width: 600px;
-          margin: 0 auto;
-          padding: 2rem 1rem;
-        }
-
-        .profile-header {
-          display: flex;
-          align-items: center;
-          gap: 1.5rem;
-          margin-bottom: 2rem;
-          padding: 2rem;
-          background: var(--card-bg);
-          border: 1px solid var(--border);
-          border-radius: 12px;
-        }
-
-        .profile-avatar {
-          width: 80px;
-          height: 80px;
-          border-radius: 50%;
-          background: var(--primary);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: white;
-          flex-shrink: 0;
-        }
-
-        .profile-info h1 {
-          font-size: 1.5rem;
-          margin: 0 0 0.5rem 0;
-          word-break: break-word;
-        }
-
-        .profile-card {
-          background: var(--card-bg);
-          border: 1px solid var(--border);
-          border-radius: 12px;
-          padding: 2rem;
-        }
-
-        .profile-card h2 {
-          font-size: 1.25rem;
-          margin: 0 0 0.5rem 0;
-        }
-
-        .card-subtitle {
-          color: var(--text-secondary);
-          margin-bottom: 1.5rem;
-          font-size: 0.95rem;
-        }
-
-        .form-group {
-          margin-bottom: 1.5rem;
-        }
-
-        .form-group label {
-          display: block;
-          margin-bottom: 0.5rem;
-          font-weight: 500;
-          color: var(--text-primary);
-          font-size: 0.95rem;
-        }
-
-        .form-group input {
-          width: 100%;
-          padding: 0.875rem;
-          border: 1px solid var(--border);
-          border-radius: 6px;
-          background: var(--bg);
-          color: var(--text-primary);
-          font-size: 1rem;
-          transition: border-color 0.2s;
-        }
-
-        .form-group input:focus {
-          outline: none;
-          border-color: var(--primary);
-          box-shadow: 0 0 0 3px rgba(2, 255, 151, 0.1);
-        }
-
-        .form-group input:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        .form-actions {
-          margin-top: 2rem;
-        }
-
-        .alert {
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-          padding: 1rem;
-          border-radius: 6px;
-          margin-bottom: 1.5rem;
-          font-size: 0.95rem;
-        }
-
-        .alert-error {
-          background: rgba(239, 68, 68, 0.1);
-          border: 1px solid rgba(239, 68, 68, 0.3);
-          color: #ef4444;
-        }
-
-        .alert-success {
-          background: rgba(16, 185, 129, 0.1);
-          border: 1px solid rgba(16, 185, 129, 0.3);
-          color: #10b981;
-        }
-
-        /* Mobile Responsive */
-        @media (max-width: 640px) {
-          .profile-page {
-            padding: 1.5rem 1rem;
-          }
-          
-          .profile-header {
-            flex-direction: column;
-            text-align: center;
-            padding: 1.5rem;
-            gap: 1rem;
-          }
-          
-          .profile-avatar {
-            width: 72px;
-            height: 72px;
-          }
-          
-          .profile-info h1 {
-            font-size: 1.25rem;
-          }
-          
-          .profile-card {
-            padding: 1.5rem;
-          }
-          
-          .profile-card h2 {
-            font-size: 1.15rem;
-          }
-          
-          .card-subtitle {
-            font-size: 0.875rem;
-          }
-          
-          /* Larger touch targets for mobile */
-          .form-group input {
-            min-height: 48px;
-            padding: 1rem;
-            font-size: 16px; /* Prevents zoom on iOS */
-          }
-          
-          .btn {
-            min-height: 48px;
-            padding: 1rem 1.5rem;
-            font-size: 1rem;
-          }
-        }
-        
-        /* Touch-friendly targets */
-        @media (hover: none) and (pointer: coarse) {
-          .form-group input {
-            min-height: 52px;
-            font-size: 16px; /* Prevents zoom on iOS */
-          }
-          
-          .btn {
-            min-height: 52px;
-          }
-        }
-      `}</style>
     </>
   );
 }

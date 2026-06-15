@@ -1,12 +1,24 @@
-import { useState, useEffect } from 'react'
-import HomePage from './pages/HomePage.jsx'
-import StatusPage from './pages/StatusPage.jsx'
-import MatchPage from './pages/MatchPage.jsx'
-import NotFoundPage from './pages/NotFoundPage.jsx'
-import LoginPage from './pages/LoginPage.jsx'
-import UsersPage from './pages/UsersPage.jsx'
-import ProfilePage from './pages/ProfilePage.jsx'
-import { useAuth } from './context/AuthContext.jsx'
+import { useState, useEffect, lazy, Suspense } from 'react'
+import { useAuth } from '../context/AuthContext.jsx'
+
+const HomePage = lazy(() => import('../pages/HomePage.jsx'))
+const StatusPage = lazy(() => import('../pages/StatusPage.jsx'))
+const MatchPage = lazy(() => import('../pages/MatchPage.jsx'))
+const NotFoundPage = lazy(() => import('../pages/NotFoundPage.jsx'))
+const LoginPage = lazy(() => import('../pages/LoginPage.jsx'))
+const UsersPage = lazy(() => import('../pages/UsersPage.jsx'))
+const ProfilePage = lazy(() => import('../pages/ProfilePage.jsx'))
+
+function LoadingFallback() {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      minHeight: '100vh', color: 'var(--text-muted)'
+    }}>
+      <div className="spinner" />
+    </div>
+  )
+}
 
 function getRoute(pathname) {
   if (pathname === '/')        return { page: 'home' }
@@ -20,7 +32,7 @@ function getRoute(pathname) {
   return { page: 'notfound' }
 }
 
-export default function Router() {
+export default function AppRoutes() {
   const { isAuthenticated, user } = useAuth()
   const [route, setRoute] = useState(() => getRoute(window.location.pathname))
 
@@ -49,26 +61,27 @@ export default function Router() {
   useEffect(() => {
     if (!isAuthenticated && route.page !== 'login') {
       window.history.pushState({}, '', '/login')
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRoute({ page: 'login' })
     }
   }, [isAuthenticated, route.page])
 
   // If not authenticated and trying to access protected pages, show login
   if (!isAuthenticated && route.page !== 'login') {
-    return <LoginPage />
+    return <Suspense fallback={<LoadingFallback />}><LoginPage /></Suspense>
   }
 
-  if (route.page === 'home')    return <HomePage />
-  if (route.page === 'status')  return <StatusPage />
-  if (route.page === 'login')   return <LoginPage />
-  if (route.page === 'profile') return <ProfilePage />
-  if (route.page === 'match')   return <MatchPage id={route.id} />
-
+  let page;
+  if (route.page === 'home')    page = <HomePage />;
+  else if (route.page === 'status')  page = <StatusPage />;
+  else if (route.page === 'login')   page = <LoginPage />;
+  else if (route.page === 'profile') page = <ProfilePage />;
+  else if (route.page === 'match')   page = <MatchPage id={route.id} />;
   // Role-guarded routes
-  if (route.page === 'users') {
-    if (user?.role !== 'super_admin') return <NotFoundPage />
-    return <UsersPage />
+  else if (route.page === 'users') {
+    page = user?.role !== 'super_admin' ? <NotFoundPage /> : <UsersPage />;
   }
+  else page = <NotFoundPage />;
 
-  return <NotFoundPage />
+  return <Suspense fallback={<LoadingFallback />}>{page}</Suspense>
 }

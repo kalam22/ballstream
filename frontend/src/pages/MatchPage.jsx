@@ -51,7 +51,9 @@ export default function MatchPage({ id }) {
         }
         setLoading(false);
         return;
-      } catch (e) {}
+      } catch {
+        // Invalid cache — fetch fresh data
+      }
     }
     
     fetchWithAuth(`/api/v1/match/${id}`)
@@ -86,6 +88,7 @@ export default function MatchPage({ id }) {
 
   useEffect(() => {
     loadMatch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   if (loading) {
@@ -463,7 +466,11 @@ export default function MatchPage({ id }) {
                   {selectedStream && (
                     <iframe
                       src={selectedStream}
-                      allow="autoplay; fullscreen; picture-in-picture"
+                      title="Live stream"
+                      allow="autoplay; fullscreen; picture-in-picture; encrypted-media; accelerometer; gyroscope"
+                      allowFullScreen
+                      webkit-playsinline="true"
+                      playsInline
                       referrerPolicy="no-referrer"
                       onLoad={() => setIframeLoading(false)}
                       style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }}

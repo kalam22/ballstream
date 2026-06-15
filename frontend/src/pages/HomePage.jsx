@@ -12,13 +12,10 @@ const STATUS_ORDER = { live: 1, upcoming: 2, finished: 3 }
 const today = formatDate(new Date())
 
 export default function HomePage() {
-  const { sports, refreshCfg } = useData()
+  const { refreshCfg } = useData()
   const { matches, loading, error, countdown } = useMatches(refreshCfg.matchesSeconds * 1000)
 
   const [statusFilter, setStatusFilter] = useState('upcoming')
-  const [activeSport, setActiveSport]   = useState(() => {
-    try { return localStorage.getItem('ks-sport') || 'all' } catch { return 'all' }
-  })
   const [leagueFilter, setLeagueFilter] = useState('all')
   const [searchRaw, setSearchRaw]       = useState('')
   const searchQuery = useDebounce(searchRaw, 250)
@@ -38,7 +35,6 @@ export default function HomePage() {
     matches
       .filter(m => {
         if (statusFilter !== 'all' && m.status !== statusFilter) return false
-        if (activeSport !== 'all' && m.sport_id !== activeSport) return false
         if (leagueFilter !== 'all' && m.league !== leagueFilter) return false
         if (searchQuery) {
           const hay = `${m.home_team?.name ?? ''} ${m.away_team?.name ?? ''} ${m.league ?? ''}`.toLowerCase()
@@ -47,7 +43,7 @@ export default function HomePage() {
         return true
       })
       .sort((a, b) => (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9))
-  , [matches, statusFilter, activeSport, leagueFilter, searchQuery])
+  , [matches, statusFilter, leagueFilter, searchQuery])
 
   const finishedMatches = useMemo(() => {
     return matches.filter(m => m.status === 'finished').slice(0, 15)

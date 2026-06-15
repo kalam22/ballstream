@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
-import { fetchWithAuth, getCSRFToken, invalidateCSRFToken } from '../utils/api'
+import { fetchWithAuth } from '../utils/api'
 
-// Re-export for consumers that import directly from useApi
-export { getCSRFToken, invalidateCSRFToken }
+export { getCSRFToken, invalidateCSRFToken } from '../utils/api'
 
 /**
  * Fetches /api/matches and auto-refreshes on interval.
@@ -10,9 +9,9 @@ export { getCSRFToken, invalidateCSRFToken }
  */
 export function useMatches(refreshMs) {
   const [matches, setMatches] = useState([])
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [countdown, setCountdown] = useState(Math.floor(refreshMs / 1000))
+  const loading = !error && matches.length === 0
 
   const fetchMatches = useCallback(() =>
     fetchWithAuth('/api/v1/matches')
@@ -28,8 +27,7 @@ export function useMatches(refreshMs) {
   , [refreshMs])
 
   useEffect(() => {
-    setLoading(true)
-    fetchMatches().finally(() => setLoading(false))
+    fetchMatches()
   }, [fetchMatches])
 
   useEffect(() => {

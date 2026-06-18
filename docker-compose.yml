@@ -73,9 +73,7 @@ services:
     container_name: ballstream_nginx
     restart: unless-stopped
     ports:
-      - "80:80"
-      # Uncomment for TLS termination (use with Certbot or external cert):
-      # - "443:443"
+      # Port defined in docker-compose.prod.yml (127.0.0.1:8082:80)
     volumes:
       - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
       # Uncomment for TLS:

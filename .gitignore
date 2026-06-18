@@ -1,3 +1,24 @@
+# Secrets — never commit
 .env
+.env.docker
+.env.production
+
+# Binaries
 *.exe
+*.dll
+*.so
+
+# Go build cache
 .gocache/
+
+# Docker runtime state
+docker/certs/
+docker/letsencrypt/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Binaries (Go build output)
+football-stream.exe
+football-stream

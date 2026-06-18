@@ -1,0 +1,26 @@
+# .dockerignore for the React/Vite frontend
+# Located at frontend/.dockerignore
+
+# Dependencies (installed inside Docker)
+node_modules/
+
+# Build output (generated inside Docker)
+dist/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.vscode
+.idea
+*.swp
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+
+# Docs
+README*

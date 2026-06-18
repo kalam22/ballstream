@@ -1,0 +1,21 @@
+# docker-compose.override.yml
+# Dev-only overrides — NOT committed production config.
+# Runs automatically alongside docker-compose.yml in development.
+# Usage: docker compose up
+
+services:
+  postgres:
+    ports:
+      - "5432:5432"   # expose postgres to host for local DB clients
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Mount source so you can iterate without rebuilding (requires air/reflex)
+    # volumes:
+    #   - .:/app
+
+  nginx:
+    ports:
+      - "80:80"

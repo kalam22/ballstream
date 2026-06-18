@@ -1,0 +1,23 @@
+# ============================================================
+# docker-compose.prod.yml — Production overrides
+# ============================================================
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# TLS: (setelah cert didapat) uncomment volume & ports 443
+
+services:
+  postgres:
+    # No ports exposed to host in production
+    ports: []
+
+  backend:
+    environment:
+      ENV: production
+      API_AUTH_REQUIRED: "true"
+
+  nginx:
+    ports:
+      - "80:80"
+      # - "443:443"   # uncomment after SSL cert setup
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+      # - ./docker/certs:/etc/nginx/certs:ro   # uncomment for TLS

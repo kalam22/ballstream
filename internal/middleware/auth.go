@@ -33,7 +33,7 @@ func Auth(next http.Handler) http.Handler {
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/internal/") {
+		if r.URL.Path == "/health" || strings.HasPrefix(r.URL.Path, "/internal/") {
 			next.ServeHTTP(w, r)
 			return
 		}
